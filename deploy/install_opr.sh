@@ -10,6 +10,9 @@ else
     KUBE_CLI=kubectl
 fi
 
+echo "DEPLOY_PATH: $DEPLOY_PATH"
+echo "KUBE_CLI: $KUBE_CLI"
+
 $KUBE_CLI create -f $DEPLOY_PATH/crds
 $KUBE_CLI create -f $DEPLOY_PATH/service_account.yaml
 $KUBE_CLI create -f $DEPLOY_PATH/role.yaml

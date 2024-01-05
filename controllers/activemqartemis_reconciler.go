@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	rtclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,19 +69,21 @@ const (
 	TCPLivenessPort                  = 8161
 	jaasConfigSuffix                 = "-jaas-config"
 	loggingConfigSuffix              = "-logging-config"
+	brokerPropsSuffix                = "-bp"
 
 	cfgMapPathBase = "/amq/extra/configmaps/"
 	secretPathBase = "/amq/extra/secrets/"
 
-	OrdinalPrefix        = "broker-"
-	OrdinalPrefixSep     = "."
-	BrokerPropertiesName = "broker.properties"
-	JaasConfigKey        = "login.config"
-	LoggingConfigKey     = "logging.properties"
-	PodNameLabelKey      = "statefulset.kubernetes.io/pod-name"
-	ServiceTypePostfix   = "svc"
-	RouteTypePostfix     = "rte"
-	IngressTypePostfix   = "ing"
+	OrdinalPrefix         = "broker-"
+	OrdinalPrefixSep      = "."
+	BrokerPropertiesName  = "broker.properties"
+	JaasConfigKey         = "login.config"
+	LoggingConfigKey      = "logging.properties"
+	PodNameLabelKey       = "statefulset.kubernetes.io/pod-name"
+	ServiceTypePostfix    = "svc"
+	RouteTypePostfix      = "rte"
+	IngressTypePostfix    = "ing"
+	RemoveKeySpecialValue = "-"
 )
 
 var defaultMessageMigration bool = true
@@ -100,12 +103,14 @@ type ActiveMQArtemisReconcilerImpl struct {
 	deployed           map[reflect.Type][]rtclient.Object
 	log                logr.Logger
 	customResource     *brokerv1beta1.ActiveMQArtemis
+	scheme             *runtime.Scheme
 }
 
-func NewActiveMQArtemisReconcilerImpl(customResource *brokerv1beta1.ActiveMQArtemis, logger logr.Logger) *ActiveMQArtemisReconcilerImpl {
+func NewActiveMQArtemisReconcilerImpl(customResource *brokerv1beta1.ActiveMQArtemis, logger logr.Logger, schemeArg *runtime.Scheme) *ActiveMQArtemisReconcilerImpl {
 	return &ActiveMQArtemisReconcilerImpl{
 		log:            logger,
 		customResource: customResource,
+		scheme:         schemeArg,
 	}
 }
 
@@ -156,8 +161,11 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) Process(customResource *brokerv
 
 	reconciler.trackDesired(desiredStatefulSet)
 
-	// this should apply any deltas/updates
+	// this will apply any deltas/updates
 	err = reconciler.ProcessResources(customResource, client, scheme)
+
+	//empty the collected objects
+	reconciler.requestedResources = nil
 
 	reconciler.log.V(1).Info("Reconciler Processing... complete", "CRD ver:", customResource.ObjectMeta.ResourceVersion, "CRD Gen:", customResource.ObjectMeta.Generation)
 
@@ -800,17 +808,19 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ExposureDefinitionForCR(customR
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) trackDesired(desired rtclient.Object) {
-	reconciler.applyTemplates(desired)
 	reconciler.requestedResources = append(reconciler.requestedResources, desired)
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) applyTemplates(desired rtclient.Object) {
-	for _, template := range reconciler.customResource.Spec.ResourceTemplates {
-		reconciler.applyTemplate(template, desired)
+func (reconciler *ActiveMQArtemisReconcilerImpl) applyTemplates(desired rtclient.Object) (err error) {
+	for index, template := range reconciler.customResource.Spec.ResourceTemplates {
+		if err = reconciler.applyTemplate(index, template, desired); err != nil {
+			break
+		}
 	}
+	return err
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) applyTemplate(template brokerv1beta1.ResourceTemplate, target rtclient.Object) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) applyTemplate(index int, template brokerv1beta1.ResourceTemplate, target rtclient.Object) error {
 	if match(template, target) {
 		ordinal := extractOrdinal(target)
 		itemName := extractItemName(target)
@@ -821,7 +831,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) applyTemplate(template brokerv1
 				modified[key] = value
 			}
 			for key, value := range template.Annotations {
-				reconciler.addFormattedKeyValue(modified, ordinal, itemName, resType, key, value)
+				reconciler.applyFormattedKeyValue(modified, ordinal, itemName, resType, key, value)
 			}
 			target.SetAnnotations(modified)
 		}
@@ -831,16 +841,45 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) applyTemplate(template brokerv1
 				modified[key] = value
 			}
 			for key, value := range template.Labels {
-				reconciler.addFormattedKeyValue(modified, ordinal, itemName, resType, key, value)
+				reconciler.applyFormattedKeyValue(modified, ordinal, itemName, resType, key, value)
 			}
 			target.SetLabels(modified)
 		}
+
+		if template.Patch != nil {
+
+			// apply any patch
+			converter := runtime.DefaultUnstructuredConverter
+
+			var err error
+			var targetAsUnstructured map[string]interface{}
+
+			if targetAsUnstructured, err = converter.ToUnstructured(target); err == nil {
+				// patch, part of our CR, needs to be mutable
+				patch := make(map[string]interface{})
+				for k, v := range template.Patch.Object {
+					patch[k] = v
+				}
+				var patched strategicpatch.JSONMap
+				if patched, err = strategicpatch.StrategicMergeMapPatch(targetAsUnstructured, patch, target); err == nil {
+					err = converter.FromUnstructuredWithValidation(patched, target, true)
+				}
+			}
+			if err != nil {
+				return fmt.Errorf("error applying strategic merge patch from template[%d] to %s, got %v", index, target.GetName(), err)
+			}
+		}
 	}
+	return nil
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) addFormattedKeyValue(collection map[string]string, ordinal string, itemName string, resType string, key string, value string) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) applyFormattedKeyValue(collection map[string]string, ordinal string, itemName string, resType string, key string, value string) {
 	formattedKey := formatTemplatedString(reconciler.customResource, key, ordinal, itemName, resType)
-	collection[formattedKey] = formatTemplatedString(reconciler.customResource, value, ordinal, itemName, resType)
+	if value == RemoveKeySpecialValue {
+		delete(collection, formattedKey)
+	} else {
+		collection[formattedKey] = formatTemplatedString(reconciler.customResource, value, ordinal, itemName, resType)
+	}
 }
 
 func extractItemName(desired rtclient.Object) string {
@@ -1251,12 +1290,15 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) CurrentDeployedResources(custom
 	}
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessResources(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme) error {
+func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessResources(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme) (err error) {
 
 	reqLogger := reconciler.log.WithValues("ActiveMQArtemis Name", customResource.Name)
 
 	for index := range reconciler.requestedResources {
 		reconciler.requestedResources[index].SetNamespace(customResource.Namespace)
+		if err = reconciler.applyTemplates(reconciler.requestedResources[index]); err != nil {
+			return err
+		}
 	}
 
 	var currenCount int
@@ -1268,27 +1310,41 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessResources(customResource
 	requested := compare.NewMapBuilder().Add(reconciler.requestedResources...).ResourceMap()
 	comparator := compare.NewMapComparator()
 
-	comparator.Comparator.SetComparator(reflect.TypeOf(appsv1.StatefulSet{}), func(deployed, requested rtclient.Object) bool {
-		ss1 := deployed.(*appsv1.StatefulSet)
-		ss2 := requested.(*appsv1.StatefulSet)
-		isEqual := equality.Semantic.DeepEqual(ss1.Spec, ss2.Spec)
-
+	comparator.Comparator.SetComparator(reflect.TypeOf(appsv1.StatefulSet{}), func(deployed, requested rtclient.Object) (isEqual bool) {
+		deployedSs := deployed.(*appsv1.StatefulSet)
+		requestedSs := requested.(*appsv1.StatefulSet)
+		isEqual = equality.Semantic.DeepEqual(deployedSs.Spec, requestedSs.Spec)
+		if isEqual {
+			isEqual = equalObjectMeta(&deployedSs.ObjectMeta, &requestedSs.ObjectMeta)
+		}
 		if !isEqual {
-			reqLogger.V(2).Info("Unequal", "depoyed", ss1.Spec, "requested", ss2.Spec)
+			reqLogger.V(2).Info("unequal", "depoyed", deployedSs, "requested", requestedSs)
 		}
 		return isEqual
 	})
 
-	comparator.Comparator.SetComparator(reflect.TypeOf(netv1.Ingress{}), func(deployed, requested rtclient.Object) bool {
-		return equality.Semantic.DeepEqual(deployed.(*netv1.Ingress).Spec, requested.(*netv1.Ingress).Spec)
+	comparator.Comparator.SetComparator(reflect.TypeOf(netv1.Ingress{}), func(deployed, requested rtclient.Object) (isEqual bool) {
+		deployedIngress := deployed.(*netv1.Ingress)
+		requestedIngress := requested.(*netv1.Ingress)
+		isEqual = equality.Semantic.DeepEqual(deployedIngress.Spec, requestedIngress.Spec)
+		if isEqual {
+			isEqual = equalObjectMeta(&deployedIngress.ObjectMeta, &requestedIngress.ObjectMeta)
+		}
+		if !isEqual {
+			reqLogger.V(2).Info("unequal", "depoyed", deployedIngress, "requested", requestedIngress)
+		}
+		return isEqual
 	})
 
-	comparator.Comparator.SetComparator(reflect.TypeOf(policyv1.PodDisruptionBudget{}), func(deployed, requested rtclient.Object) bool {
-		pdb1 := deployed.(*policyv1.PodDisruptionBudget)
-		pdb2 := requested.(*policyv1.PodDisruptionBudget)
-		isEqual := equality.Semantic.DeepEqual(pdb1.Spec, pdb2.Spec)
+	comparator.Comparator.SetComparator(reflect.TypeOf(policyv1.PodDisruptionBudget{}), func(deployed, requested rtclient.Object) (isEqual bool) {
+		deployedPdb := deployed.(*policyv1.PodDisruptionBudget)
+		requestedPdb := requested.(*policyv1.PodDisruptionBudget)
+		isEqual = equality.Semantic.DeepEqual(deployedPdb.Spec, requestedPdb.Spec)
+		if isEqual {
+			isEqual = equalObjectMeta(&deployedPdb.ObjectMeta, &requestedPdb.ObjectMeta)
+		}
 		if !isEqual {
-			reqLogger.V(2).Info("Unequal", "depoyed", pdb1.Spec, "requested", pdb2.Spec)
+			reqLogger.V(2).Info("unequal", "depoyed", deployedPdb, "requested", requestedPdb)
 		}
 		return isEqual
 	})
@@ -1317,9 +1373,6 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessResources(customResource
 		}
 	}
 
-	//empty the collected objects
-	reconciler.requestedResources = nil
-
 	if len(compositeError) == 0 {
 		return nil
 	} else {
@@ -1327,6 +1380,16 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessResources(customResource
 		// using %q(uote) to keep errors separate
 		return fmt.Errorf("%q", compositeError)
 	}
+}
+
+// resourceTemplate means we can modify labels and annotatins so we need to
+// respect those in our comparison logic
+func equalObjectMeta(deployed *metav1.ObjectMeta, requested *metav1.ObjectMeta) (isEqual bool) {
+	var pairs [][2]interface{}
+	pairs = append(pairs, [2]interface{}{deployed.Labels, requested.Labels})
+	pairs = append(pairs, [2]interface{}{deployed.Annotations, requested.Annotations})
+	isEqual = compare.EqualPairs(pairs)
+	return isEqual
 }
 
 func trackError(compositeError *[]error, err error) {
@@ -1364,8 +1427,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) updateRequestedResource(customR
 	if updateError = resources.Update(client, requested); updateError == nil {
 		reconciler.log.V(1).Info("updated", "kind ", kind, "named ", requested.GetName())
 	} else {
-
-		reconciler.log.Error(updateError, "updated Failed", "kind ", kind, "named ", requested.GetName())
+		reconciler.log.V(0).Info("updated Failed", "kind ", kind, "named ", requested.GetName(), "error ", updateError)
 	}
 	return updateError
 }
@@ -1858,7 +1920,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) NewPodTemplateSpecForCR(customR
 	if !isSecret {
 		mountPoint = cfgMapPathBase
 	}
-	brokerPropsValue := brokerPropertiesConfigSystemPropValue(mountPoint, brokerPropertiesResourceName, brokerPropertiesMapData)
+	brokerPropsValue := brokerPropertiesConfigSystemPropValue(customResource, mountPoint, brokerPropertiesResourceName, brokerPropertiesMapData)
 
 	// only use init container JAVA_OPTS on existing deployments and migrate to JDK_JAVA_OPTIONS for independence
 	// from init containers and broker run scripts
@@ -1950,14 +2012,23 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) NewPodTemplateSpecForCR(customR
 	return pts, nil
 }
 
-func brokerPropertiesConfigSystemPropValue(mountPoint, resourceName string, brokerPropertiesData map[string]string) string {
+func brokerPropertiesConfigSystemPropValue(customResource *brokerv1beta1.ActiveMQArtemis, mountPoint, resourceName string, brokerPropertiesData map[string]string) string {
+	var result = ""
 	if len(brokerPropertiesData) == 1 {
 		// single entry, no ordinal subpath - broker will log if arg is not found for the watcher so make conditional
-		return fmt.Sprintf("-Dbroker.properties=%s%s/%s", mountPoint, resourceName, BrokerPropertiesName)
+		result = fmt.Sprintf("-Dbroker.properties=%s%s/%s", mountPoint, resourceName, BrokerPropertiesName)
 	} else {
 		// directory works on broker image versions >= 2.27.1
-		return fmt.Sprintf("-Dbroker.properties=%s%s/,%s%s/%s${STATEFUL_SET_ORDINAL}/", mountPoint, resourceName, mountPoint, resourceName, OrdinalPrefix)
+		result = fmt.Sprintf("-Dbroker.properties=%s%s/,%s%s/%s${STATEFUL_SET_ORDINAL}/", mountPoint, resourceName, mountPoint, resourceName, OrdinalPrefix)
 	}
+
+	for _, extraSecretName := range customResource.Spec.DeploymentPlan.ExtraMounts.Secrets {
+		if strings.HasSuffix(extraSecretName, brokerPropsSuffix) {
+			// formated append to result with comma
+			result = fmt.Sprintf("%s,%s%s/", result, secretPathBase, extraSecretName)
+		}
+	}
+	return result
 }
 
 func getJaasConfigExtraMountPath(customResource *brokerv1beta1.ActiveMQArtemis) (string, bool) {
@@ -2376,7 +2447,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) NewStatefulSetForCR(customResou
 		Namespace: customResource.Namespace,
 	}
 	replicas := common.GetDeploymentSize(customResource)
-	currentStateFullSet = ss.MakeStatefulSet(currentStateFullSet, namer.SsNameBuilder.Name(), namer.SvcHeadlessNameBuilder.Name(), namespacedName, customResource.Annotations, namer.LabelBuilder.Labels(), &replicas)
+	currentStateFullSet = ss.MakeStatefulSet(currentStateFullSet, namer.SsNameBuilder.Name(), namer.SvcHeadlessNameBuilder.Name(), namespacedName, nil, namer.LabelBuilder.Labels(), &replicas)
 
 	podTemplateSpec, err := reconciler.NewPodTemplateSpecForCR(customResource, namer, &currentStateFullSet.Spec.Template, client)
 	if err != nil {
@@ -2620,16 +2691,41 @@ func AssertBrokersAvailable(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.C
 func AssertBrokerPropertiesStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme) ArtemisError {
 	reqLogger := ctrl.Log.WithValues("ActiveMQArtemis Name", cr.Name)
 
-	Projection, err := getConfigMappedBrokerProperties(cr, client)
+	secretProjection, err := getSecretProjection(getConfigAppliedConfigMapName(cr), client)
 	if err != nil {
 		reqLogger.V(2).Info("error retrieving config resources. requeing")
 		return NewUnknownJolokiaError(err)
 	}
 
-	return checkStatus(cr, client, Projection, func(BrokerStatus brokerStatus, FileName string) (propertiesStatus, bool) {
+	errorStatus := checkStatus(cr, client, secretProjection, func(BrokerStatus brokerStatus, FileName string) (propertiesStatus, bool) {
 		current, present := BrokerStatus.BrokerConfigStatus.PropertiesStatus[FileName]
 		return current, present
 	})
+
+	if errorStatus == nil {
+		for _, extraSecretName := range cr.Spec.DeploymentPlan.ExtraMounts.Secrets {
+			if strings.HasSuffix(extraSecretName, brokerPropsSuffix) {
+
+				secretProjection, err = getSecretProjection(types.NamespacedName{Name: extraSecretName, Namespace: cr.Namespace}, client)
+				if err != nil {
+					reqLogger.V(2).Info("error retrieving -bp extra mount resource. requeing")
+					return NewUnknownJolokiaError(err)
+				}
+				errorStatus = checkStatus(cr, client, secretProjection, func(BrokerStatus brokerStatus, FileName string) (propertiesStatus, bool) {
+					current, present := BrokerStatus.BrokerConfigStatus.PropertiesStatus[FileName]
+					return current, present
+				})
+				if errorStatus == nil {
+					updateExtraConfigStatus(cr, secretProjection)
+				} else {
+					// report the first error
+					break
+				}
+			}
+		}
+	}
+
+	return errorStatus
 }
 
 func AssertJaasPropertiesStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme) ArtemisError {
@@ -2653,7 +2749,7 @@ func AssertJaasPropertiesStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclie
 	return statusError
 }
 
-func checkStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, Projection *projection, extractStatus func(BrokerStatus brokerStatus, FileName string) (propertiesStatus, bool)) ArtemisError {
+func checkStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, secretProjection *projection, extractStatus func(BrokerStatus brokerStatus, FileName string) (propertiesStatus, bool)) ArtemisError {
 	reqLogger := ctrl.Log.WithValues("ActiveMQArtemis Name", cr.Name)
 
 	resource := types.NamespacedName{
@@ -2670,7 +2766,7 @@ func checkStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, Proj
 		return NewJolokiaClientsNotFoundError(errors.New("Waiting for Jolokia Clients to become available"))
 	}
 
-	reqLogger.V(2).Info("in sync check", "projection", Projection)
+	reqLogger.V(2).Info("in sync check", "projection", secretProjection)
 
 	for _, jk := range jks {
 		currentJson, err := jk.Artemis.GetStatus()
@@ -2693,8 +2789,9 @@ func checkStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, Proj
 		var current propertiesStatus
 		var present bool
 		missingKeys := []string{}
+		var applyError *inSyncApplyError = nil
 
-		for name, file := range Projection.Files {
+		for name, file := range secretProjection.Files {
 
 			current, present = extractStatus(brokerStatus, name)
 
@@ -2710,51 +2807,49 @@ func checkStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, Proj
 			if current.Alder32 == "" {
 				err = errors.Errorf("out of sync on pod %s-%s, property file %s has an empty checksum",
 					namer.CrToSS(cr.Name), jk.Ordinal, name)
-				reqLogger.V(1).Info(err.Error(), "status", brokerStatus, "tracked", Projection)
+				reqLogger.V(1).Info(err.Error(), "status", brokerStatus, "tracked", secretProjection)
 				return NewStatusOutOfSyncError(err)
 			}
 
 			if file.Alder32 != current.Alder32 {
 				err = errors.Errorf("out of sync on pod %s-%s, mismatched checksum on property file %s, expected: %s, current: %s. A delay can occur before a volume mount projection is refreshed.",
 					namer.CrToSS(cr.Name), jk.Ordinal, name, file.Alder32, current.Alder32)
-				reqLogger.V(1).Info(err.Error(), "status", brokerStatus, "tracked", Projection)
+				reqLogger.V(1).Info(err.Error(), "status", brokerStatus, "tracked", secretProjection)
 				return NewStatusOutOfSyncError(err)
+			}
+
+			// check for apply errors
+			if len(current.ApplyErrors) > 0 {
+				// some props did not apply for k
+				if applyError == nil {
+					applyError = NewInSyncWithError(secretProjection, fmt.Sprintf("%s-%s", namer.CrToSS(cr.Name), jk.Ordinal))
+				}
+				applyError.ErrorApplyDetail(name, marshallApplyErrors(current.ApplyErrors))
 			}
 		}
 
+		if applyError != nil {
+			reqLogger.V(1).Info("in sync with apply error", "error", applyError)
+			return *applyError
+		}
+
 		if len(missingKeys) > 0 {
-			if strings.HasSuffix(Projection.Name, jaasConfigSuffix) {
+			if strings.HasSuffix(secretProjection.Name, jaasConfigSuffix) {
 				err = errors.Errorf("out of sync on pod %s-%s, property files are not visible on the broker: %v. Reloadable JAAS LoginModule property files are only visible after the first login attempt that references them. If the property files are for by a third party LoginModule or not reloadable, prefix the property file names with an underscore to exclude them from this condition",
 					namer.CrToSS(cr.Name), jk.Ordinal, missingKeys)
 			} else {
 				err = errors.Errorf("out of sync on pod %s-%s, configuration property files are not visible on the broker: %v. A delay can occur before a volume mount projection is refreshed.",
 					namer.CrToSS(cr.Name), jk.Ordinal, missingKeys)
 			}
-			reqLogger.V(1).Info(err.Error(), "status", brokerStatus, "tracked", Projection)
+			reqLogger.V(1).Info(err.Error(), "status", brokerStatus, "tracked", secretProjection)
 			return NewStatusOutOfSyncMissingKeyError(err)
 		}
 
-		// all in sync, check for apply errors
-		var applyError *inSyncApplyError = nil
-		for k, v := range brokerStatus.BrokerConfigStatus.PropertiesStatus {
-			if len(v.ApplyErrors) > 0 {
-				// some props did not apply for k
-				if applyError == nil {
-					applyError = NewInSyncWithError(fmt.Sprintf("%s-%s", namer.CrToSS(cr.Name), jk.Ordinal))
-				}
-				applyError.ErrorApplyDetail(k, marshallApplyErrors(v.ApplyErrors))
-			}
-		}
-		if applyError != nil {
-			reqLogger.V(1).Info("in sync with apply error", "error", applyError)
-			return *applyError
-		}
-
 		// this oridinal is happy
-		Projection.Ordinals = append(Projection.Ordinals, jk.Ordinal)
+		secretProjection.Ordinals = append(secretProjection.Ordinals, jk.Ordinal)
 	}
 
-	reqLogger.V(1).Info("successfully synced with broker", "status", statusMessageFromProjection(Projection))
+	reqLogger.V(1).Info("successfully synced with broker", "status", statusMessageFromProjection(secretProjection))
 	return nil
 }
 
@@ -2784,28 +2879,20 @@ func updateExtraConfigStatus(cr *brokerv1beta1.ActiveMQArtemis, Projection *proj
 		brokerv1beta1.ExternalConfigStatus{Name: Projection.Name, ResourceVersion: Projection.ResourceVersion})
 }
 
-func getConfigMappedBrokerProperties(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client) (*projection, error) {
-
-	cmName := getConfigAppliedConfigMapName(cr)
+func getSecretProjection(secretName types.NamespacedName, client rtclient.Client) (*projection, error) {
 	resource := corev1.Secret{}
-	err := client.Get(context.TODO(), cmName, &resource)
+	err := client.Get(context.TODO(), secretName, &resource)
 	if err != nil {
-		return nil, NewUnknownJolokiaError(errors.Wrap(err, "unable to retrieve mutable properties resource"))
+		return nil, NewUnknownJolokiaError(errors.Wrap(err, "unable to retrieve mutable properties secret"))
 	}
 	return newProjectionFromByteValues(resource.ObjectMeta, resource.Data), nil
 }
 
 func getConfigMappedJaasProperties(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Client) (*projection, error) {
-	var instance *projection
 	if _, name, found := getConfigExtraMount(cr, jaasConfigSuffix); found {
-		resource := corev1.Secret{}
-		err := client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Namespace, Name: name}, &resource)
-		if err != nil {
-			return nil, NewUnknownJolokiaError(errors.Wrap(err, "unable to retrieve mutable secret to hash"))
-		}
-		instance = newProjectionFromByteValues(resource.ObjectMeta, resource.Data)
+		return getSecretProjection(types.NamespacedName{Namespace: cr.Namespace, Name: name}, client)
 	}
-	return instance, nil
+	return nil, nil
 }
 
 func newProjectionFromByteValues(resourceMeta metav1.ObjectMeta, configKeyValue map[string][]byte) *projection {

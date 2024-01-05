@@ -1,3 +1,346 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: activemq-artemis-operator
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.2
+  name: activemqartemisaddresses.broker.amq.io
+spec:
+  group: broker.amq.io
+  names:
+    kind: ActiveMQArtemisAddress
+    listKind: ActiveMQArtemisAddressList
+    plural: activemqartemisaddresses
+    shortNames:
+    - aaa
+    singular: activemqartemisaddress
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Adding and removing addresses using custom resource definitions
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisAddressSpec defines the desired state of ActiveMQArtemisAddress
+            properties:
+              addressName:
+                description: The Address Name
+                type: string
+              applyToCrNames:
+                description: Apply to the broker crs in the current namespace. A value of * or empty string means applying to all broker crs. Default apply to all broker crs
+                items:
+                  type: string
+                type: array
+              password:
+                description: The password for the user
+                type: string
+              queueConfiguration:
+                description: Specify the queue configuration
+                properties:
+                  autoCreateAddress:
+                    description: Whether auto create address
+                    type: boolean
+                  autoDelete:
+                    description: Auto-delete the queue
+                    type: boolean
+                  autoDeleteDelay:
+                    description: Delay (Milliseconds) before auto-delete the queue
+                    format: int64
+                    type: integer
+                  autoDeleteMessageCount:
+                    description: Message count of the queue to allow auto delete
+                    format: int64
+                    type: integer
+                  configurationManaged:
+                    description: If the queue is configuration managed
+                    type: boolean
+                  consumerPriority:
+                    description: Consumer Priority
+                    format: int32
+                    type: integer
+                  consumersBeforeDispatch:
+                    description: Number of consumers required before dispatching messages
+                    format: int32
+                    type: integer
+                  delayBeforeDispatch:
+                    description: Milliseconds to wait for `consumers-before-dispatch` to be met before dispatching messages anyway
+                    format: int64
+                    type: integer
+                  durable:
+                    description: If the queue is durable or not
+                    type: boolean
+                  enabled:
+                    description: If the queue is enabled
+                    type: boolean
+                  exclusive:
+                    description: If the queue is exclusive
+                    type: boolean
+                  filterString:
+                    description: The filter string for the queue
+                    type: string
+                  groupBuckets:
+                    description: Number of messaging group buckets
+                    format: int32
+                    type: integer
+                  groupFirstKey:
+                    description: Header set on the first group message
+                    type: string
+                  groupRebalance:
+                    description: If rebalance the message group
+                    type: boolean
+                  groupRebalancePauseDispatch:
+                    description: If pause message dispatch when rebalancing groups
+                    type: boolean
+                  ignoreIfExists:
+                    description: If ignore if the target queue already exists
+                    type: boolean
+                  lastValue:
+                    description: If it is a last value queue
+                    type: boolean
+                  lastValueKey:
+                    description: The property used for last value queue to identify last values
+                    type: string
+                  maxConsumers:
+                    description: Max number of consumers allowed on this queue
+                    format: int32
+                    type: integer
+                  nonDestructive:
+                    description: If force non-destructive consumers on the queue
+                    type: boolean
+                  purgeOnNoConsumers:
+                    description: Whether to delete all messages when no consumers connected to the queue
+                    type: boolean
+                  ringSize:
+                    description: The size the queue should maintain according to ring semantics
+                    format: int64
+                    type: integer
+                  routingType:
+                    description: The routing type of the queue
+                    type: string
+                  temporary:
+                    description: If the queue is temporary
+                    type: boolean
+                  user:
+                    description: The user associated with the queue
+                    type: string
+                type: object
+              queueName:
+                description: The Queue Name
+                type: string
+              removeFromBrokerOnDelete:
+                description: Whether or not delete the queue from broker when CR is undeployed(default false)
+                type: boolean
+              routingType:
+                description: The Routing Type
+                type: string
+              user:
+                description: User name for creating the queue or address
+                type: string
+            type: object
+          status:
+            description: ActiveMQArtemisAddressStatus defines the observed state of ActiveMQArtemisAddress
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+  - name: v2alpha1
+    schema:
+      openAPIV3Schema:
+        description: ActiveMQArtemisAddress is the Schema for the activemqartemisaddresses API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisAddressSpec defines the desired state of ActiveMQArtemisAddress
+            properties:
+              addressName:
+                type: string
+              queueName:
+                type: string
+              routingType:
+                type: string
+            required:
+            - addressName
+            - queueName
+            - routingType
+            type: object
+          status:
+            description: ActiveMQArtemisAddressStatus defines the observed state of ActiveMQArtemisAddress
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v2alpha2
+    schema:
+      openAPIV3Schema:
+        description: ActiveMQArtemisAddress is the Schema for the activemqartemisaddresses API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisAddressSpec defines the desired state of ActiveMQArtemisAddress
+            properties:
+              addressName:
+                type: string
+              queueName:
+                type: string
+              removeFromBrokerOnDelete:
+                type: boolean
+              routingType:
+                type: string
+            required:
+            - addressName
+            - queueName
+            - removeFromBrokerOnDelete
+            - routingType
+            type: object
+          status:
+            description: ActiveMQArtemisAddressStatus defines the observed state of ActiveMQArtemisAddress
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v2alpha3
+    schema:
+      openAPIV3Schema:
+        description: ActiveMQArtemisAddress is the Schema for the activemqartemisaddresses API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisAddressSpec defines the desired state of ActiveMQArtemisAddress
+            properties:
+              addressName:
+                type: string
+              applyToCrNames:
+                items:
+                  type: string
+                type: array
+              password:
+                type: string
+              queueConfiguration:
+                properties:
+                  autoCreateAddress:
+                    type: boolean
+                  autoDelete:
+                    type: boolean
+                  autoDeleteDelay:
+                    format: int64
+                    type: integer
+                  autoDeleteMessageCount:
+                    format: int64
+                    type: integer
+                  configurationManaged:
+                    type: boolean
+                  consumerPriority:
+                    format: int32
+                    type: integer
+                  consumersBeforeDispatch:
+                    format: int32
+                    type: integer
+                  delayBeforeDispatch:
+                    format: int64
+                    type: integer
+                  durable:
+                    type: boolean
+                  enabled:
+                    type: boolean
+                  exclusive:
+                    type: boolean
+                  filterString:
+                    type: string
+                  groupBuckets:
+                    format: int32
+                    type: integer
+                  groupFirstKey:
+                    type: string
+                  groupRebalance:
+                    type: boolean
+                  groupRebalancePauseDispatch:
+                    type: boolean
+                  ignoreIfExists:
+                    type: boolean
+                  lastValue:
+                    type: boolean
+                  lastValueKey:
+                    type: string
+                  maxConsumers:
+                    format: int32
+                    type: integer
+                  nonDestructive:
+                    type: boolean
+                  purgeOnNoConsumers:
+                    type: boolean
+                  ringSize:
+                    format: int64
+                    type: integer
+                  routingType:
+                    type: string
+                  temporary:
+                    type: boolean
+                  user:
+                    type: string
+                required:
+                - maxConsumers
+                - purgeOnNoConsumers
+                type: object
+              queueName:
+                type: string
+              removeFromBrokerOnDelete:
+                type: boolean
+              routingType:
+                type: string
+              user:
+                type: string
+            type: object
+          status:
+            description: ActiveMQArtemisAddressStatus defines the observed state of ActiveMQArtemisAddress
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -3339,3 +3682,1416 @@ spec:
     storage: false
     subresources:
       status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.2
+  name: activemqartemisscaledowns.broker.amq.io
+spec:
+  group: broker.amq.io
+  names:
+    kind: ActiveMQArtemisScaledown
+    listKind: ActiveMQArtemisScaledownList
+    plural: activemqartemisscaledowns
+    shortNames:
+    - aad
+    singular: activemqartemisscaledown
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Provides message migration on clustered broker scaledown
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisScaledownSpec defines the desired state of ActiveMQArtemisScaledown
+            properties:
+              localOnly:
+                description: Triggered by main ActiveMQArtemis CRD messageMigration entry
+                type: boolean
+              resources:
+                description: Specifies the minimum/maximum amount of compute resources required/allowed
+                properties:
+                  claims:
+                    description: "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. \n This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. \n This field is immutable."
+                    items:
+                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                      properties:
+                        name:
+                          description: Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                type: object
+            required:
+            - localOnly
+            type: object
+          status:
+            description: ActiveMQArtemisScaledownStatus defines the observed state of ActiveMQArtemisScaledown
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+  - name: v2alpha1
+    schema:
+      openAPIV3Schema:
+        description: ActiveMQArtemisScaledown is the Schema for the activemqartemisscaledowns API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisScaledownSpec defines the desired state of ActiveMQArtemisScaledown
+            properties:
+              localOnly:
+                description: Triggered by main ActiveMQArtemis CRD messageMigration entry
+                type: boolean
+            required:
+            - localOnly
+            type: object
+          status:
+            description: ActiveMQArtemisScaledownStatus defines the observed state of ActiveMQArtemisScaledown
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.2
+  name: activemqartemissecurities.broker.amq.io
+spec:
+  group: broker.amq.io
+  names:
+    kind: ActiveMQArtemisSecurity
+    listKind: ActiveMQArtemisSecurityList
+    plural: activemqartemissecurities
+    shortNames:
+    - aas
+    singular: activemqartemissecurity
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Security configuration for the broker
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisSecuritySpec defines the desired state of ActiveMQArtemisSecurity
+            properties:
+              applyToCrNames:
+                description: Apply this security config to the broker crs in the current namespace. A value of * or empty string means applying to all broker crs. Default apply to all broker crs
+                items:
+                  type: string
+                type: array
+              loginModules:
+                description: Specifies the login modules (deprecated in favour of ActiveMQArtemisSpec.DeploymentPlan.ExtraMounts.Secrets -jaas-config)
+                properties:
+                  guestLoginModules:
+                    description: Specifies the guest login modules
+                    items:
+                      properties:
+                        guestRole:
+                          description: The guest user role
+                          type: string
+                        guestUser:
+                          description: The guest user name
+                          type: string
+                        name:
+                          description: Name for GuestLoginModule
+                          type: string
+                      type: object
+                    type: array
+                  keycloakLoginModules:
+                    description: Specifies the Keycloak login modules
+                    items:
+                      properties:
+                        configuration:
+                          description: Specifies the Keycloak module configuration
+                          properties:
+                            allowAnyHostName:
+                              description: If to allow any host name
+                              type: boolean
+                            alwaysRefreshToken:
+                              description: If always refresh token
+                              type: boolean
+                            authServerUrl:
+                              description: URL of the keycloak authentication server
+                              type: string
+                            autoDetectBearerOnly:
+                              description: If auto-detect bearer token only
+                              type: boolean
+                            bearerOnly:
+                              description: If only verify bearer token
+                              type: boolean
+                            clientKeyPassword:
+                              description: Client key password
+                              type: string
+                            clientKeyStore:
+                              description: Path of a client keystore
+                              type: string
+                            clientKeyStorePassword:
+                              description: Client keystore password
+                              type: string
+                            confidentialPort:
+                              description: The confidential port used by the Keycloak server for secure connections over SSL/TLS
+                              format: int32
+                              type: integer
+                            connectionPoolSize:
+                              description: Size of the connection pool
+                              format: int64
+                              type: integer
+                            corsAllowedHeaders:
+                              description: CORS allowed headers
+                              type: string
+                            corsAllowedMethods:
+                              description: CORS allowed methods
+                              type: string
+                            corsExposedHeaders:
+                              description: CORS exposed headers
+                              type: string
+                            corsMaxAge:
+                              description: CORS max age
+                              format: int64
+                              type: integer
+                            credentials:
+                              description: Specify the credentials
+                              items:
+                                properties:
+                                  key:
+                                    description: The regular expression to match the Redirect URI
+                                    type: string
+                                  value:
+                                    description: The replacement value
+                                    type: string
+                                type: object
+                              type: array
+                            disableTrustManager:
+                              description: If to disable trust manager
+                              type: boolean
+                            enableBasicAuth:
+                              description: Whether to support basic authentication
+                              type: boolean
+                            enableCors:
+                              description: If to enable CORS
+                              type: boolean
+                            exposeToken:
+                              description: If to expose access token
+                              type: boolean
+                            ignoreOauthQueryParameter:
+                              description: Whether to turn off processing of the access_token query parameter for bearer token processing
+                              type: boolean
+                            minTimeBetweenJwksRequests:
+                              description: Minimum interval between two requests to Keycloak to retrieve new public keys
+                              format: int64
+                              type: integer
+                            principalAttribute:
+                              description: OpenID Connect ID Token attribute to populate the UserPrincipal name with
+                              type: string
+                            proxyUrl:
+                              description: The proxy URL
+                              type: string
+                            publicClient:
+                              description: If it is public client
+                              type: boolean
+                            publicKeyCacheTtl:
+                              description: Maximum interval between two requests to Keycloak to retrieve new public keys
+                              format: int64
+                              type: integer
+                            realm:
+                              description: Realm for KeycloakLoginModule
+                              type: string
+                            realmPublicKey:
+                              description: Public key for the realm
+                              type: string
+                            redirectRewriteRules:
+                              description: Specify the redirect rewrite rules
+                              items:
+                                properties:
+                                  key:
+                                    description: The regular expression to match the Redirect URI
+                                    type: string
+                                  value:
+                                    description: The replacement value
+                                    type: string
+                                type: object
+                              type: array
+                            registerNodeAtStartup:
+                              description: If register node at startup
+                              type: boolean
+                            registerNodePeriod:
+                              description: Period for re-registering node
+                              format: int64
+                              type: integer
+                            resource:
+                              description: Resource Name
+                              type: string
+                            scope:
+                              description: The OAuth2 scope parameter for DirectAccessGrantsLoginModule
+                              type: string
+                            sslRequired:
+                              description: How SSL is required
+                              type: string
+                            tokenCookiePath:
+                              description: Cookie path for a cookie store
+                              type: string
+                            tokenMinimumTimeToLive:
+                              description: Minimum time to refresh an active access token
+                              format: int64
+                              type: integer
+                            tokenStore:
+                              description: Type of token store. session or cookie
+                              type: string
+                            trustStore:
+                              description: Path of a trust store
+                              type: string
+                            trustStorePassword:
+                              description: Truststore password
+                              type: string
+                            turnOffChangeSessionIdOnLogin:
+                              description: If not to change session id on a successful login
+                              type: boolean
+                            useResourceRoleMappings:
+                              description: If to use resource role mappings
+                              type: boolean
+                            verifyTokenAudience:
+                              description: Verify whether the token contains this client name (resource) as an audience
+                              type: boolean
+                          type: object
+                        moduleType:
+                          description: Type of KeycloakLoginModule directAccess or bearerToken
+                          type: string
+                        name:
+                          description: Name for KeycloakLoginModule
+                          type: string
+                      type: object
+                    type: array
+                  propertiesLoginModules:
+                    description: Specifies the properties login modules
+                    items:
+                      properties:
+                        name:
+                          description: Name for PropertiesLoginModule
+                          type: string
+                        users:
+                          description: Specifies the users
+                          items:
+                            properties:
+                              name:
+                                description: User name to be defined in properties login module
+                                type: string
+                              password:
+                                description: Password to be defined in properties login module
+                                type: string
+                              roles:
+                                description: Roles to be defined in properties login module
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                type: object
+              securityDomains:
+                description: Specifies the security domains (deprecated in favour of ActiveMQArtemisSpec.DeploymentPlan.ExtraMounts.Secrets -jaas-config)
+                properties:
+                  brokerDomain:
+                    description: Specify the broker domain
+                    properties:
+                      loginModules:
+                        description: Specify the login modules
+                        items:
+                          properties:
+                            debug:
+                              description: Debug option of the login module
+                              type: boolean
+                            flag:
+                              description: Flag of the login module
+                              type: string
+                            name:
+                              description: Name of the login module
+                              type: string
+                            reload:
+                              description: Reload option of the login module
+                              type: boolean
+                          type: object
+                        type: array
+                      name:
+                        description: Name for the broker/console domain
+                        type: string
+                    type: object
+                  consoleDomain:
+                    description: Specify the console domain
+                    properties:
+                      loginModules:
+                        description: Specify the login modules
+                        items:
+                          properties:
+                            debug:
+                              description: Debug option of the login module
+                              type: boolean
+                            flag:
+                              description: Flag of the login module
+                              type: string
+                            name:
+                              description: Name of the login module
+                              type: string
+                            reload:
+                              description: Reload option of the login module
+                              type: boolean
+                          type: object
+                        type: array
+                      name:
+                        description: Name for the broker/console domain
+                        type: string
+                    type: object
+                type: object
+              securitySettings:
+                description: Specifies the security settings
+                properties:
+                  broker:
+                    description: Specify the broker security settings
+                    items:
+                      properties:
+                        match:
+                          description: The address match pattern of a security setting
+                          type: string
+                        permissions:
+                          description: Specify the permissions
+                          items:
+                            properties:
+                              operationType:
+                                description: The operation type of a security setting
+                                type: string
+                              roles:
+                                description: The roles of a security setting
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - operationType
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  management:
+                    description: Specify the management security settings
+                    properties:
+                      authorisation:
+                        description: Specify the authorisation configurations
+                        properties:
+                          allowedList:
+                            description: Specify the allowed entries
+                            items:
+                              properties:
+                                domain:
+                                  description: The domain of allowedList
+                                  type: string
+                                key:
+                                  description: The key of allowedList
+                                  type: string
+                              type: object
+                            type: array
+                          defaultAccess:
+                            description: Specify the default accesses
+                            items:
+                              properties:
+                                method:
+                                  description: Specifies the access entry method
+                                  type: string
+                                roles:
+                                  description: Specifies the access entry roles
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            type: array
+                          roleAccess:
+                            description: Specify the role accesses
+                            items:
+                              properties:
+                                accessList:
+                                  description: Specify the default accesses
+                                  items:
+                                    properties:
+                                      method:
+                                        description: Specifies the access entry method
+                                        type: string
+                                      roles:
+                                        description: Specifies the access entry roles
+                                        items:
+                                          type: string
+                                        type: array
+                                    type: object
+                                  type: array
+                                domain:
+                                  description: The domain of the role access
+                                  type: string
+                                key:
+                                  description: The key of the role access
+                                  type: string
+                              type: object
+                            type: array
+                        type: object
+                      connector:
+                        description: Specify connector configurations
+                        properties:
+                          authenticatorType:
+                            description: The management authentication type
+                            type: string
+                          host:
+                            description: The connector host for connecting to management
+                            type: string
+                          jmxRealm:
+                            description: The JMX realm of management
+                            type: string
+                          keyStorePassword:
+                            description: The keystore password for management connector
+                            type: string
+                          keyStorePath:
+                            description: The keystore path for management connector
+                            type: string
+                          keyStoreProvider:
+                            description: The keystore provider for management connector
+                            type: string
+                          objectName:
+                            description: The JMX object name of management
+                            type: string
+                          passwordCodec:
+                            description: The password codec for management connector
+                            type: string
+                          port:
+                            description: The connector port for connecting to management
+                            format: int32
+                            type: integer
+                          rmiRegistryPort:
+                            description: The RMI registry port for management
+                            format: int32
+                            type: integer
+                          secured:
+                            description: Whether management connection is secured
+                            type: boolean
+                          trustStorePassword:
+                            description: The truststore password for management connector
+                            type: string
+                          trustStorePath:
+                            description: The truststore path for management connector
+                            type: string
+                          trustStoreProvider:
+                            description: The truststore provider for management connector
+                            type: string
+                        type: object
+                      hawtioRoles:
+                        description: The roles allowed to login hawtio
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
+            type: object
+          status:
+            description: Specifies the security status modules
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Security configuration for the broker
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ActiveMQArtemisSecuritySpec defines the desired state of ActiveMQArtemisSecurity
+            properties:
+              applyToCrNames:
+                description: Apply this security config to the broker crs in the current namespace. A value of * or empty string means applying to all broker crs. Default apply to all broker crs
+                items:
+                  type: string
+                type: array
+              loginModules:
+                description: Specifies the login modules (deprecated in favour of ActiveMQArtemisSpec.DeploymentPlan.ExtraMounts.Secrets -jaas-config)
+                properties:
+                  guestLoginModules:
+                    description: Specifies the guest login modules
+                    items:
+                      properties:
+                        guestRole:
+                          description: The guest user role
+                          type: string
+                        guestUser:
+                          description: The guest user name
+                          type: string
+                        name:
+                          description: Name for GuestLoginModule
+                          type: string
+                      type: object
+                    type: array
+                  keycloakLoginModules:
+                    description: Specifies the Keycloak login modules
+                    items:
+                      properties:
+                        configuration:
+                          description: Specifies the Keycloak module configuration
+                          properties:
+                            allowAnyHostName:
+                              description: If to allow any host name
+                              type: boolean
+                            alwaysRefreshToken:
+                              description: If always refresh token
+                              type: boolean
+                            authServerUrl:
+                              description: URL of the keycloak authentication server
+                              type: string
+                            autoDetectBearerOnly:
+                              description: If auto-detect bearer token only
+                              type: boolean
+                            bearerOnly:
+                              description: If only verify bearer token
+                              type: boolean
+                            clientKeyPassword:
+                              description: Client key password
+                              type: string
+                            clientKeyStore:
+                              description: Path of a client keystore
+                              type: string
+                            clientKeyStorePassword:
+                              description: Client keystore password
+                              type: string
+                            confidentialPort:
+                              description: The confidential port used by the Keycloak server for secure connections over SSL/TLS
+                              format: int32
+                              type: integer
+                            connectionPoolSize:
+                              description: Size of the connection pool
+                              format: int64
+                              type: integer
+                            corsAllowedHeaders:
+                              description: CORS allowed headers
+                              type: string
+                            corsAllowedMethods:
+                              description: CORS allowed methods
+                              type: string
+                            corsExposedHeaders:
+                              description: CORS exposed headers
+                              type: string
+                            corsMaxAge:
+                              description: CORS max age
+                              format: int64
+                              type: integer
+                            credentials:
+                              description: Specify the credentials
+                              items:
+                                properties:
+                                  key:
+                                    description: The regular expression to match the Redirect URI
+                                    type: string
+                                  value:
+                                    description: The replacement value
+                                    type: string
+                                type: object
+                              type: array
+                            disableTrustManager:
+                              description: If to disable trust manager
+                              type: boolean
+                            enableBasicAuth:
+                              description: Whether to support basic authentication
+                              type: boolean
+                            enableCors:
+                              description: If to enable CORS
+                              type: boolean
+                            exposeToken:
+                              description: If to expose access token
+                              type: boolean
+                            ignoreOauthQueryParameter:
+                              description: Whether to turn off processing of the access_token query parameter for bearer token processing
+                              type: boolean
+                            minTimeBetweenJwksRequests:
+                              description: Minimum interval between two requests to Keycloak to retrieve new public keys
+                              format: int64
+                              type: integer
+                            principalAttribute:
+                              description: OpenID Connect ID Token attribute to populate the UserPrincipal name with
+                              type: string
+                            proxyUrl:
+                              description: The proxy URL
+                              type: string
+                            publicClient:
+                              description: If it is public client
+                              type: boolean
+                            publicKeyCacheTtl:
+                              description: Maximum interval between two requests to Keycloak to retrieve new public keys
+                              format: int64
+                              type: integer
+                            realm:
+                              description: Realm for KeycloakLoginModule
+                              type: string
+                            realmPublicKey:
+                              description: Public key for the realm
+                              type: string
+                            redirectRewriteRules:
+                              description: Specify the redirect rewrite rules
+                              items:
+                                properties:
+                                  key:
+                                    description: The regular expression to match the Redirect URI
+                                    type: string
+                                  value:
+                                    description: The replacement value
+                                    type: string
+                                type: object
+                              type: array
+                            registerNodeAtStartup:
+                              description: If register node at startup
+                              type: boolean
+                            registerNodePeriod:
+                              description: Period for re-registering node
+                              format: int64
+                              type: integer
+                            resource:
+                              description: Resource Name
+                              type: string
+                            scope:
+                              description: The OAuth2 scope parameter for DirectAccessGrantsLoginModule
+                              type: string
+                            sslRequired:
+                              description: How SSL is required
+                              type: string
+                            tokenCookiePath:
+                              description: Cookie path for a cookie store
+                              type: string
+                            tokenMinimumTimeToLive:
+                              description: Minimum time to refresh an active access token
+                              format: int64
+                              type: integer
+                            tokenStore:
+                              description: Type of token store. session or cookie
+                              type: string
+                            trustStore:
+                              description: Path of a trust store
+                              type: string
+                            trustStorePassword:
+                              description: Truststore password
+                              type: string
+                            turnOffChangeSessionIdOnLogin:
+                              description: If not to change session id on a successful login
+                              type: boolean
+                            useResourceRoleMappings:
+                              description: If to use resource role mappings
+                              type: boolean
+                            verifyTokenAudience:
+                              description: Verify whether the token contains this client name (resource) as an audience
+                              type: boolean
+                          type: object
+                        moduleType:
+                          description: Type of KeycloakLoginModule directAccess or bearerToken
+                          type: string
+                        name:
+                          description: Name for KeycloakLoginModule
+                          type: string
+                      type: object
+                    type: array
+                  propertiesLoginModules:
+                    description: Specifies the properties login modules
+                    items:
+                      properties:
+                        name:
+                          description: Name for PropertiesLoginModule
+                          type: string
+                        users:
+                          description: Specifies the users
+                          items:
+                            properties:
+                              name:
+                                description: User name to be defined in properties login module
+                                type: string
+                              password:
+                                description: Password to be defined in properties login module
+                                type: string
+                              roles:
+                                description: Roles to be defined in properties login module
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                type: object
+              securityDomains:
+                description: Specifies the security domains (deprecated in favour of ActiveMQArtemisSpec.DeploymentPlan.ExtraMounts.Secrets -jaas-config)
+                properties:
+                  brokerDomain:
+                    description: Specify the broker domain
+                    properties:
+                      loginModules:
+                        description: Specify the login modules
+                        items:
+                          properties:
+                            debug:
+                              description: Debug option of the login module
+                              type: boolean
+                            flag:
+                              description: Flag of the login module
+                              type: string
+                            name:
+                              description: Name of the login module
+                              type: string
+                            reload:
+                              description: Reload option of the login module
+                              type: boolean
+                          type: object
+                        type: array
+                      name:
+                        description: Name for the broker/console domain
+                        type: string
+                    type: object
+                  consoleDomain:
+                    description: Specify the console domain
+                    properties:
+                      loginModules:
+                        description: Specify the login modules
+                        items:
+                          properties:
+                            debug:
+                              description: Debug option of the login module
+                              type: boolean
+                            flag:
+                              description: Flag of the login module
+                              type: string
+                            name:
+                              description: Name of the login module
+                              type: string
+                            reload:
+                              description: Reload option of the login module
+                              type: boolean
+                          type: object
+                        type: array
+                      name:
+                        description: Name for the broker/console domain
+                        type: string
+                    type: object
+                type: object
+              securitySettings:
+                description: Specifies the security settings
+                properties:
+                  broker:
+                    description: Specify the broker security settings
+                    items:
+                      properties:
+                        match:
+                          description: The address match pattern of a security setting
+                          type: string
+                        permissions:
+                          description: Specify the permissions
+                          items:
+                            properties:
+                              operationType:
+                                description: The operation type of a security setting
+                                type: string
+                              roles:
+                                description: The roles of a security setting
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - operationType
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  management:
+                    description: Specify the management security settings
+                    properties:
+                      authorisation:
+                        description: Specify the authorisation configurations
+                        properties:
+                          allowedList:
+                            description: Specify the allowed entries
+                            items:
+                              properties:
+                                domain:
+                                  description: The domain of allowedList
+                                  type: string
+                                key:
+                                  description: The key of allowedList
+                                  type: string
+                              type: object
+                            type: array
+                          defaultAccess:
+                            description: Specify the default accesses
+                            items:
+                              properties:
+                                method:
+                                  description: Specifies the access entry method
+                                  type: string
+                                roles:
+                                  description: Specifies the access entry roles
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            type: array
+                          roleAccess:
+                            description: Specify the role accesses
+                            items:
+                              properties:
+                                accessList:
+                                  description: Specify the default accesses
+                                  items:
+                                    properties:
+                                      method:
+                                        description: Specifies the access entry method
+                                        type: string
+                                      roles:
+                                        description: Specifies the access entry roles
+                                        items:
+                                          type: string
+                                        type: array
+                                    type: object
+                                  type: array
+                                domain:
+                                  description: The domain of the role access
+                                  type: string
+                                key:
+                                  description: The key of the role access
+                                  type: string
+                              type: object
+                            type: array
+                        type: object
+                      connector:
+                        description: Specify connector configurations
+                        properties:
+                          authenticatorType:
+                            description: The management authentication type
+                            type: string
+                          host:
+                            description: The connector host for connecting to management
+                            type: string
+                          jmxRealm:
+                            description: The JMX realm of management
+                            type: string
+                          keyStorePassword:
+                            description: The keystore password for management connector
+                            type: string
+                          keyStorePath:
+                            description: The keystore path for management connector
+                            type: string
+                          keyStoreProvider:
+                            description: The keystore provider for management connector
+                            type: string
+                          keyStoreType:
+                            description: The keystore type for management connector
+                            type: string
+                          objectName:
+                            description: The JMX object name of management
+                            type: string
+                          passwordCodec:
+                            description: The password codec for management connector
+                            type: string
+                          port:
+                            description: The connector port for connecting to management
+                            format: int32
+                            type: integer
+                          rmiRegistryPort:
+                            description: The RMI registry port for management
+                            format: int32
+                            type: integer
+                          secured:
+                            description: Whether management connection is secured
+                            type: boolean
+                          trustStorePassword:
+                            description: The truststore password for management connector
+                            type: string
+                          trustStorePath:
+                            description: The truststore path for management connector
+                            type: string
+                          trustStoreProvider:
+                            description: The truststore provider for management connector
+                            type: string
+                          trustStoreType:
+                            description: The truststore type for management connector
+                            type: string
+                        type: object
+                      hawtioRoles:
+                        description: The roles allowed to login hawtio
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
+            type: object
+          status:
+            description: Specifies the security status modules
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: activemq-artemis-controller-manager
+  namespace: activemq-artemis-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: activemq-artemis-leader-election-role
+  namespace: activemq-artemis-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: activemq-artemis-operator-role
+  namespace: activemq-artemis-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - endpoints
+  - events
+  - persistentvolumeclaims
+  - pods
+  - routes
+  - secrets
+  - serviceaccounts
+  - services
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  - statefulsets
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemisaddresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemisaddresses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemisaddresses/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemises
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemises/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemises/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemisscaledowns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemisscaledowns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemisscaledowns/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemissecurities
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemissecurities/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - activemqartemissecurities/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - broker.amq.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  - routes/custom-host
+  - routes/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: activemq-artemis-leader-election-rolebinding
+  namespace: activemq-artemis-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: activemq-artemis-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: activemq-artemis-controller-manager
+  namespace: activemq-artemis-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: activemq-artemis-operator-rolebinding
+  namespace: activemq-artemis-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: activemq-artemis-operator-role
+subjects:
+- kind: ServiceAccount
+  name: activemq-artemis-controller-manager
+  namespace: activemq-artemis-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: activemq-artemis-controller-manager
+  namespace: activemq-artemis-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        name: activemq-artemis-operator
+    spec:
+      containers:
+      - args:
+        - --zap-log-level=info
+        - --zap-encoder=console
+        - --zap-time-encoding=iso8601
+        - --leader-elect
+        command:
+        - /home/activemq-artemis-operator/bin/entrypoint
+        env:
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2150
+          value: quay.io/artemiscloud/activemq-artemis-broker-init:0.2.2
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2160
+          value: quay.io/artemiscloud/activemq-artemis-broker-init:0.2.4
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2180
+          value: quay.io/artemiscloud/activemq-artemis-broker-init:0.2.10
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2200
+          value: quay.io/artemiscloud/activemq-artemis-broker-init:1.0.0
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2210
+          value: quay.io/artemiscloud/activemq-artemis-broker-init:1.0.2
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2220
+          value: quay.io/artemiscloud/activemq-artemis-broker-init:1.0.5
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2230
+          value: quay.io/artemiscloud/activemq-artemis-broker-init:1.0.7
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2250
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:e2438670831bad39bb08147bbebe67ef9465899fb7750f1a5a185569f99d5fb5
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2260
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:634f3d8fd620607b56e0360a191d23a9cb8a32ba0ba1f24fe20791ec52343586
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2270
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:9bbb915855f29ea16950a3fd50d0b9bac25f82cba7d197579e04d9c33a5b02c4
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2271
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:fc9b9a4c7550d84fd90335dd4f9e0d8d39c09136c6034b28490a368368cb11f1
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2280
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:264b33a9aad90d32a41258904f35092a141d76dcef0c115d414475444100aace
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2150
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:0.2.0
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2160
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:0.2.1
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2180
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:0.2.7
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2200
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:1.0.0
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2210
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:1.0.2
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2220
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:1.0.5
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2230
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:1.0.7
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2250
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:2d155bffd246f26f516a6075ec170babc1373c72bb664cba4e3c58521ffd3558
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2260
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:f25db980c3229e66cf48690aa175f6f93e3dce3974c0e70ab23af6462e7d1893
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2270
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:a4628c2591ec06caf21a3467f6e3faeaede7fa402b4f137d943b25b4dd4ad343
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2271
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:2895b2cf6292c951a0cdde78e755514f5d7cb43ce9f7b6e7dc381d8dfeec31ab
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2280
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:42230ce9d11a1949a5bb73b6ee218b1581f585bcd553485ee438e1c5b50fcf8b
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2290
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:56bae938a6b4cd87f9f5284931f440f9b9d116cda3b63b13f83a4b1c6c641959
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2290
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:4be60cfa2a300b2eef9b5f10ea756bd3f55d75fbd8890232d907f8d64080449b
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2300
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:88a0098a628fe43a9b422f8ebb774086fb65ed389a195e2779482a4a63447e28
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2300
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:8fbdd1ba728058d5f437186b9055ca28596140068ebc69ecff4fa52717b19a82
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2310
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:e438bcacf099a92b143793e88c00c6ac0afb31effe4b0eed49a935c9265ad943
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2310
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:4bba8828e72fd7c9d38c22ba1c2a4f7130817a4e7eac8fb63c13e86465a8e1e7
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2312
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:ddaf00914e3a412d21ec3a814e24f3d4cc382b5c4d6c21e9b1b94dde16ddf194
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2312
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:81590ec33b2f00775d3c6596f610887b670de7c0b89148b09eab7584f5b0b0ec
+        - name: OPERATOR_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['name']
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: WATCH_NAMESPACE
+          value: ''
+        - name: ENABLE_WEBHOOKS
+          value: "false"
+        image: quay.io/artemiscloud/activemq-artemis-operator:1.0.16
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: activemq-artemis-controller-manager
+      terminationGracePeriodSeconds: 10

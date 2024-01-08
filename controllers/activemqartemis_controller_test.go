@@ -57,6 +57,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -3283,7 +3284,7 @@ var _ = Describe("artemis controller", func() {
 			crd.Spec.Console.Expose = true
 			crd.Spec.Console.SSLEnabled = true
 
-			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log)
+			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log, k8sClient.Scheme())
 
 			defaultConsoleSecretName := crd.Name + "-console-secret"
 			currentSS := &appsv1.StatefulSet{}
@@ -3363,7 +3364,7 @@ var _ = Describe("artemis controller", func() {
 				g.Expect(createdCrd.ResourceVersion).ShouldNot(BeEmpty())
 			}, timeout, interval).Should(Succeed())
 
-			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log)
+			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log, k8sClient.Scheme())
 			namer := MakeNamers(&crd)
 			defaultConsoleSecretName := crd.Name + "-console-secret"
 			internalSecretName := defaultConsoleSecretName + "-internal"
@@ -3461,7 +3462,7 @@ var _ = Describe("artemis controller", func() {
 
 			}, timeout, interval).Should(Succeed())
 
-			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log)
+			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log, k8sClient.Scheme())
 			reconcilerImpl.deployed = make(map[reflect.Type][]client.Object)
 
 			namer := MakeNamers(&crd)
@@ -3969,6 +3970,72 @@ var _ = Describe("artemis controller", func() {
 					}
 				}
 				g.Expect(found).To(Equal(2))
+
+			}, timeout, interval).Should(Succeed())
+
+			By("verify external mod to annotation is respected by reconcile")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, key, createdSs)).Should(Succeed())
+				createdSs.Spec.Template.Annotations["externalController"] = "seen it!"
+				g.Expect(createdSs.GetAnnotations()).To(BeNil())
+				createdSs.Annotations = map[string]string{}
+				createdSs.Annotations["externalController"] = "seen it!"
+				g.Expect(k8sClient.Update(ctx, createdSs)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			By("forcing reconcile with further annotation update")
+			Eventually(func(g Gomega) {
+				g.Expect(getPersistedVersionedCrd(brokerCr.Name, defaultNamespace, createdCr)).Should(BeTrue())
+				createdCr.Spec.DeploymentPlan.Annotations["new"] = "true"
+				g.Expect(k8sClient.Update(ctx, createdCr)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			By("verify reconcile and external annotaion present")
+			createdSs = &appsv1.StatefulSet{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, key, createdSs)).Should(Succeed())
+
+				_, ok := createdSs.Spec.Template.Annotations["externalController"]
+				g.Expect(ok).Should(BeTrue())
+
+				_, ok = createdSs.Spec.Template.Annotations["new"]
+				g.Expect(ok).Should(BeTrue())
+
+				_, ok = createdSs.Spec.Template.Annotations["promethes-prop"]
+				g.Expect(ok).Should(BeTrue())
+
+				_, ok = createdSs.Annotations["externalController"]
+				g.Expect(ok).Should(BeTrue())
+
+			}, timeout, interval).Should(Succeed())
+
+			By("verify annotation removal")
+			stateFulSetKindString := "StatefulSet"
+			Eventually(func(g Gomega) {
+				g.Expect(getPersistedVersionedCrd(brokerCr.Name, defaultNamespace, createdCr)).Should(BeTrue())
+				createdCr.Spec.ResourceTemplates = []brokerv1beta1.ResourceTemplate{
+					{
+						Selector: &brokerv1beta1.ResourceSelector{
+							Kind: &stateFulSetKindString,
+						},
+						Annotations: map[string]string{
+							"externalController": "-",
+							"removalDone":        "true"},
+					},
+				}
+				g.Expect(k8sClient.Update(ctx, createdCr)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			By("verify reconcile and external annotaion removed via resource template")
+			createdSs = &appsv1.StatefulSet{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, key, createdSs)).Should(Succeed())
+
+				_, ok := createdSs.Annotations["removalDone"]
+				g.Expect(ok).Should(BeTrue())
+
+				_, ok = createdSs.Annotations["externalController"]
+				g.Expect(ok).Should(BeFalse())
 
 			}, timeout, interval).Should(Succeed())
 
@@ -5947,6 +6014,103 @@ var _ = Describe("artemis controller", func() {
 
 				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
+			}
+			// cleanup
+			CleanResource(&crd, crd.Name, defaultNamespace)
+		})
+	})
+
+	Context("template tests", func() {
+		It("expect custom service", func() {
+
+			By("By creating a crd with template")
+			ctx := context.Background()
+			crd := generateArtemisSpec(defaultNamespace)
+			crd.Spec.DeploymentPlan.PersistenceEnabled = true
+
+			var serviceKind = "Service"
+			var ssKind = "StatefulSet"
+
+			crd.Spec.ResourceTemplates = []brokerv1beta1.ResourceTemplate{
+				{
+					Selector:    &brokerv1beta1.ResourceSelector{Kind: &serviceKind},
+					Annotations: map[string]string{"someKey": "someValue"},
+					Patch: &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"kind": "Service",
+							"spec": map[string]interface{}{
+								"publishNotReadyAddresses": false,
+							},
+						},
+					},
+				},
+				{
+					Selector:    &brokerv1beta1.ResourceSelector{Kind: &ssKind},
+					Annotations: map[string]string{"someSsKey": "someSsValue"},
+					Patch: &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"kind": "StatefulSet",
+							"spec": map[string]interface{}{
+								"template": map[string]interface{}{
+									"spec": map[string]interface{}{
+										"containers": []interface{}{
+											map[string]interface{}{
+												// support for variable substutition is non trivial (and not done) for an unstuctured type
+												"name": crd.Name + /* "$(CR_NAME) */ "-container", // merge on name key
+												"securityContext": map[string]interface{}{
+													"runAsNonRoot": true,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+
+				createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+				brokerKey := types.NamespacedName{Name: crd.Name, Namespace: crd.Namespace}
+
+				By("verifying started via Status")
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+
+					//if verbose {
+					fmt.Printf("\nSTATUS: %v\n", createdCrd.Status)
+					//}
+					g.Expect(meta.IsStatusConditionTrue(createdCrd.Status.Conditions, brokerv1beta1.ReadyConditionType)).Should(BeTrue())
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				By("checking customied -hdls-svc")
+				createdService := &corev1.Service{}
+				serviceKey := types.NamespacedName{Name: crd.Name + "-hdls-svc", Namespace: crd.Namespace}
+
+				By("verifying started via Status")
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, serviceKey, createdService)).Should(Succeed())
+					g.Expect(createdService.Spec.PublishNotReadyAddresses).Should(BeFalse())
+					g.Expect(createdService.Annotations["someKey"]).Should(Equal("someValue"))
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				createdSs := &appsv1.StatefulSet{}
+				key := types.NamespacedName{Name: namer.CrToSS(crd.Name), Namespace: defaultNamespace}
+
+				By("Making sure that the ss gets customised")
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, key, createdSs)).Should(Succeed())
+
+					g.Expect(createdSs.Annotations["someSsKey"]).Should(Equal("someSsValue"))
+					g.Expect(*createdSs.Spec.Template.Spec.Containers[0].SecurityContext.RunAsNonRoot).Should(BeTrue())
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 			}
 			// cleanup
 			CleanResource(&crd, crd.Name, defaultNamespace)
@@ -8496,6 +8660,86 @@ var _ = Describe("artemis controller", func() {
 					g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
 					// user/role custom properties have been loaded
 					g.Expect(meta.IsStatusConditionTrue(createdCrd.Status.Conditions, brokerv1beta1.JaasConfigAppliedConditionType)).Should(BeTrue())
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+			}
+
+			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, &crd)).To(Succeed())
+		})
+
+		It("extraSecret with broker properties -bp suffix", func() {
+
+			ctx := context.Background()
+			crd := generateArtemisSpec(defaultNamespace)
+
+			secret := &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "k8s.io.api.core.v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "x-bp",
+					Namespace: crd.ObjectMeta.Namespace,
+				},
+			}
+
+			secret.StringData = map[string]string{
+				"address.properties":  `bla=bla`,
+				"acceptor.properties": `acceptorConfigurations.artemis.params.router=autoShard`,
+			}
+
+			crd.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+			crd.Spec.DeploymentPlan.ExtraMounts.Secrets = []string{secret.Name}
+
+			By("Deploying the -bp secret " + secret.ObjectMeta.Name)
+			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
+
+			By("Deploying the CRD " + crd.ObjectMeta.Name)
+			Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+
+				createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+				brokerKey := types.NamespacedName{Name: crd.Name, Namespace: crd.Namespace}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+
+					condition := meta.FindStatusCondition(createdCrd.Status.Conditions, brokerv1beta1.ConfigAppliedConditionType)
+					g.Expect(condition).NotTo(BeNil())
+
+					g.Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+
+					g.Expect(condition.Reason).Should(Equal(brokerv1beta1.ConfigAppliedConditionSynchedWithErrorReason))
+					g.Expect(condition.Message).Should(ContainSubstring("bla"))
+
+					// find some reference to the secret source
+					g.Expect(condition.Message).Should(ContainSubstring("x-bp"))
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				By("fix -bp secret via update")
+				createdSecret := &corev1.Secret{}
+				secretKey := types.NamespacedName{
+					Name:      secret.ObjectMeta.Name,
+					Namespace: defaultNamespace,
+				}
+
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, secretKey, createdSecret)).To(Succeed())
+
+					createdSecret.Data["address.properties"] = []byte(`addressesSettings.#.redeliveryMultiplier=2.3`)
+					g.Expect(k8sClient.Update(ctx, createdSecret)).Should(Succeed())
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				By("verify status ok")
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+
+					condition := meta.FindStatusCondition(createdCrd.Status.Conditions, brokerv1beta1.ConfigAppliedConditionType)
+					g.Expect(condition).NotTo(BeNil())
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 
 				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 			}

@@ -16,7 +16,7 @@ spec:
   acceptors:
     - name: amqp
       protocols: amqp
-      port: 5672
+      port: 5672 # Expose the amqp port outside the single broker pods
       connectionsAllowed: 5
   # Expose the management console
   console:

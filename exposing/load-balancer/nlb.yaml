@@ -10,7 +10,7 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
-    - port: 8161
+    - port: 80
       targetPort: 8161
       name: http
   selector:

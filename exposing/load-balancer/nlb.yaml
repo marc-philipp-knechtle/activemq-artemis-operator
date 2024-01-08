@@ -10,8 +10,8 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
-    - port: 80
-      targetPort: 8080
+    - port: 8161
+      targetPort: 8161
       name: http
   selector:
     app.kubernetes.io/name: artemis-broker-hdls-svc

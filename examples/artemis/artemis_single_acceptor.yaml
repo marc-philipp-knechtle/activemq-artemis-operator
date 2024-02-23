@@ -10,10 +10,17 @@ spec:
 #      port: 8161
 #      protocols: all
 #      sslEnabled: false
+    # see artemis_springcloud.yaml
     - name: amqp
       protocols: amqp
       port: 5672
       connectionsAllowed: 5
+    # See also file: artemis_ssl_acceptor_cert_and_trust_managers.yaml
+    - name: test
+      protocols: all
+      port: 61616
+      sslEnabled: false
+      expose: True
   console:
     expose: true
     name: webconsole

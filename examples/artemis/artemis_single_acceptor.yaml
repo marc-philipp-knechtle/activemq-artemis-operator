@@ -4,9 +4,19 @@ metadata:
   name: artemis-broker
 spec:
   acceptors:
-    - name: management-console
-      expose: true
-      port: 8161
-      protocols: all
-      sslEnabled: false
-
+#    This is commented since we have the console as separate item below
+#    - name: management-console
+#      expose: true
+#      port: 8161
+#      protocols: all
+#      sslEnabled: false
+    - name: amqp
+      protocols: amqp
+      port: 5672
+      connectionsAllowed: 5
+  console:
+    expose: true
+    name: webconsole
+    sslEnabled: False
+  adminUser: postgres
+  adminPassword: postgres

@@ -11,15 +11,21 @@ spec:
 #      protocols: all
 #      sslEnabled: false
     # see artemis_springcloud.yaml
-    - name: amqp
-      protocols: amqp
-      port: 5672
-      connectionsAllowed: 5
+    # Todo - maybe it's better to limit the acceptor not to include all protocols -> exclude all not necessary protocols
+#    - name: amqp
+#      protocols: amqp
+#      port: 5672
+#      connectionsAllowed: 5
     # See also file: artemis_ssl_acceptor_cert_and_trust_managers.yaml
-    - name: test
+    # See file: broker_activemqartemis_cr.yaml
+    - name: anevis-acceptor-all
       protocols: all
       port: 61616
       sslEnabled: false
+      enabledProtocols: TLSv1,TLSv1.1,TLSv1.2
+      needClientAuth: false
+      wantClientAuth: false
+      verifyHost: false
       expose: True
   console:
     expose: true

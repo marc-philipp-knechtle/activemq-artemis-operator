@@ -10,3 +10,10 @@ spec:
       protocols: all
       port: 61617
       sslEnabled: true
+  console:
+      expose: true
+      name: webconsole
+      sslEnabled: true
+      sslSecret: ...
+  adminUser: postgres
+  adminPassword: postgres

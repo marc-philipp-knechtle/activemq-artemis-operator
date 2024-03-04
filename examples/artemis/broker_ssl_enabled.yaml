@@ -1,0 +1,12 @@
+# See: https://artemiscloud.io/docs/tutorials/ssl_broker_setup/
+# The deployment Plan sections needs to disabled as this was written when the whole project was in alpha stage
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: ex-aao
+spec:
+  acceptors:
+    - name: sslacceptor
+      protocols: all
+      port: 61617
+      sslEnabled: true

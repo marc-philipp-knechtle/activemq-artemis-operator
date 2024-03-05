@@ -1,0 +1,26 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: amq-tls-acceptor-cert
+  namespace: activemq-artemis-operator
+spec:
+  secretName: amq-ssl-secret
+  duration: 2160h # 90d
+  renewBefore: 360h # 15d
+  commonName: artemis-broker-ssl-0.activemq-artemis-operator.svc.cluster.local
+  dnsNames:
+  - artemis-broker-ssl-0-svc.activemq-artemis-operator.svc
+  - artemis-broker-ssl-0-svc.activemq-artemis-operator
+  - artemis-broker-ssl-0-svc
+  - artemis-broker-ss-0
+  issuerRef:
+    name: my-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+  keystores:
+    jks:
+      create: true
+      passwordSecretRef: # Password used to encrypt the keystore and truststore
+        key: password
+        name: jks-password-secret
+

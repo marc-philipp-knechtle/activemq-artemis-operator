@@ -5,15 +5,26 @@ kind: ActiveMQArtemis
 metadata:
   name: ex-aao
 spec:
+  # acceptors:
+  #   - name: sslacceptor
+  #     protocols: all
+  #     port: 61617
+  #     sslEnabled: true
   acceptors:
-    - name: sslacceptor
+    - name: sslacceptor-all
       protocols: all
-      port: 61617
+      port: 61616
       sslEnabled: true
+      sslSecret: ex-aao-sslacceptor-secret
+      # enabledProtocols: TLSv1,TLSv1.1,TLSv1.2
+      # needClientAuth: false
+      # wantClientAuth: false
+      # verifyHost: false
+      # expose: True
   console:
       expose: true
       name: webconsole
-      sslEnabled: true
-      sslSecret: ...
+      sslEnabled: false
+      # sslSecret: ex-aao-sslacceptor-secret
   adminUser: postgres
   adminPassword: postgres

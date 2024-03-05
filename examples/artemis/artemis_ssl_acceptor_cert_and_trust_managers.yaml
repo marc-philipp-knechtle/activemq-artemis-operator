@@ -15,5 +15,5 @@ spec:
     extraMounts:
       secrets:
       - amq-ssl-secret
-      configMaps:
-      - ca-bundle
+#      configMaps:
+#      - ca-bundle

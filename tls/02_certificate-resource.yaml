@@ -5,6 +5,7 @@ metadata:
   name: amq-tls-acceptor-cert
   namespace: activemq-artemis-operator
 spec:
+  # this gets mounted in artemis_ssl_acceptor_cert_and_trust_managers.yaml
   secretName: amq-ssl-secret
   duration: 2160h # 90d
   renewBefore: 360h # 15d

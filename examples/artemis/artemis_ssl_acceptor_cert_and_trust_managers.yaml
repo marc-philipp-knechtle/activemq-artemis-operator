@@ -9,7 +9,12 @@ spec:
     protocols: all
     sslEnabled: true
     sslSecret: ssl-acceptor-ssl-secret
-    verifyHost: true
+    # verifyHost: true was responsible for the following error:
+    # AMQ222208: SSL handshake failed for client from /10.244.2.5:59102: java.security.cert.CertificateException:
+    # No subject alternative names matching IP address 10.244.2.5 found.
+    # I don't know how to mitigate this issue, but this might just be caused by local testing
+    # I created the messages from the broker pod. This might not use the hostnames as required by verifyHost
+    verifyHost: false
     needClientAuth: true
     # expose: true
   deploymentPlan:

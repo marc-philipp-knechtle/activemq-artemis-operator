@@ -1,4 +1,5 @@
 apiVersion: cert-manager.io/v1
+# https://cert-manager.io/docs/usage/certificate/
 kind: Certificate
 metadata:
   name: amq-tls-acceptor-cert
@@ -20,6 +21,8 @@ spec:
   keystores:
     jks:
       create: true
+      # Command used to create this password:
+      # kubectl create secret generic -n activemq-artemis-operator jks-password-secret --from-literal=password=password
       passwordSecretRef: # Password used to encrypt the keystore and truststore
         key: password
         name: jks-password-secret

@@ -1,4 +1,7 @@
 apiVersion: cert-manager.io/v1
+# https://cert-manager.io/docs/configuration/
+# Cluster Issuer represent certificate authorities
+# CAs are able to sign certs in response to certificate signing requests
 kind: ClusterIssuer
 metadata:
   name: selfsigned-cluster-issuer
@@ -7,6 +10,9 @@ spec:
   selfSigned: {}
 ---
 apiVersion: cert-manager.io/v1
+# https://cert-manager.io/docs/usage/certificate/
+# Certificate represents human readable definition of a certificate requests
+# cert-manager generates with this a private key and CertificateRequest Resource
 kind: Certificate
 metadata:
   name: my-selfsigned-ca

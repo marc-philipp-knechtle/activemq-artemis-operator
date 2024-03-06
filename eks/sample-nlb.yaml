@@ -1,0 +1,22 @@
+# Created after tutorial: 
+# https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
+apiVersion: v1
+kind: Service
+metadata:
+  name: artemis-broker-nlb
+  namespace: eks-artemis-operator
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  ports:
+    # port where the nlb listens on
+    - port: 61616
+      # Forwarding to local ports
+      targetPort: 61616
+      protocol: TCP
+  type: LoadBalancer
+  selector:
+    app: activemq-artemis-controller-manager
+

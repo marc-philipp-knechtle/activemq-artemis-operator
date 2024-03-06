@@ -1,0 +1,65 @@
+# EKS Cluster Configuration file
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+availabilityZones:
+- ${AWS_REGION}a
+- ${AWS_REGION}b
+- ${AWS_REGION}c
+
+metadata:
+  name: ${EKS_CLUSTER_NAME}
+  region: ${AWS_REGION}
+  version: '1.27'
+  tags:
+    karpenter.sh/discovery: ${EKS_CLUSTER_NAME}
+    created-by: eks-workshop-v2
+    env: ${EKS_CLUSTER_NAME}
+
+# Enables OpenID Connect
+# = interoperable authentication framework
+# Removes the responsibility of setting, storing and managing passwords, with OpenID Provider
+# Widely adopted by identity providers over the internet
+iam:
+  withOIDC: true
+
+vpc:
+  cidr: 10.42.0.0/16
+  # = accessibility of the Kubernetes API server
+  clusterEndpoints:
+    privateAccess: true
+    publicAccess: true
+
+addons:
+  # CNI = Container Network Interface
+  # VPC-NVI is a kubernetes networking plugin used in eks 
+  # Jobs: Allocating VPC Ip addresses to k8s nodes, configuring the networking for each pod on each node
+- name: vpc-cni
+  version: 1.14.1
+  # ENABLE_PREFIX_DELEGATION = assign multiple IP addresses from a large IP address block to a network interface
+  # ENABLE_POD_ENI = enables Pod Elastic Network Interface, allows to assign ENI to a Pod for network traffic isolution
+  # POD_SECURITY_GROU_ENFORCING_MODE = standard = security group specified in the pod annotation withh be enforced
+  # enableNetworkPolicy = allows to control traffic flow at IP address and Poert level
+  configurationValues:  "{\"env\":{\"ENABLE_PREFIX_DELEGATION\":\"true\", \"ENABLE_POD_ENI\":\"true\", \"POD_SECURITY_GROUP_ENFORCING_MODE\":\"standard\"},\"enableNetworkPolicy\": \"true\"}"
+  # This config overwrites any previous config
+  resolveConflicts: overwrite
+
+managedNodeGroups:
+- name: default
+  desiredCapacity: 3
+  minSize: 3
+  maxSize: 6
+  # instanceType: m5.large
+  # t2.micro is sufficient for amazonmq -> testing for artemis...
+  # instanceType: t2.micro
+  instanceType: t3.micro
+  # All worker nodes are launched into private subnets
+  privateNetworking: true
+  releaseVersion: 1.27.3-20230816
+  updateConfig:
+    # maximum percentage of nodes that can be unavailable during an update
+    maxUnavailablePercentage: 50
+  # the kubernetes labels to be applied to the nodes in the node group
+  labels:
+    workshop-default: 'yes'
+

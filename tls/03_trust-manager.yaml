@@ -1,14 +1,19 @@
 apiVersion: trust.cert-manager.io/v1alpha1
+# Bundle is the only CR which the trust-manager uses
+# trust-manager is designet to complement cert-manager and can consume CA certs from cert-manager Issuer or ClusterIssuer
 kind: Bundle
 metadata:
   name: ca-bundle
   namespace: cert-manager
 spec:
+  # based on these sources, the trust-manager assembles the final bundle
   sources:
   # all default CAs
+  # default CAs = Let's Encrypt, Google, Amazon etc.
   - useDefaultCAs: true
   # plus our custom local CA
   - secret:
+      # this is the copy of the root-secret
       name: "local-ca-cert-copy-trust-manager"
       key: "tls.crt"
   target:
@@ -17,4 +22,3 @@ spec:
     additionalFormats:
       jks:
         key: "truststore.jks"
-

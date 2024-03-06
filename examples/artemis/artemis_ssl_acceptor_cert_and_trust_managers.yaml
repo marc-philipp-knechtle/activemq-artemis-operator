@@ -23,3 +23,7 @@ spec:
       - amq-ssl-secret
       configMaps:
       - ca-bundle
+  console:
+    expose: true
+    name: webconsole
+    sslEnabled: False

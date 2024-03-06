@@ -11,6 +11,7 @@ spec:
     sslSecret: ssl-acceptor-ssl-secret
     verifyHost: true
     needClientAuth: true
+    # expose: true
   deploymentPlan:
     extraMounts:
       secrets:

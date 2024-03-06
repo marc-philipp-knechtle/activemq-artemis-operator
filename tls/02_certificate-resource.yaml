@@ -14,6 +14,8 @@ spec:
   - artemis-broker-ssl-0-svc.activemq-artemis-operator
   - artemis-broker-ssl-0-svc
   - artemis-broker-ss-0
+  # ipAddresses:
+  # - 10.42.152.82
   issuerRef:
     name: my-ca-issuer
     kind: ClusterIssuer

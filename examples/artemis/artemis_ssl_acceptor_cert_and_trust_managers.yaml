@@ -16,7 +16,7 @@ spec:
     # I created the messages from the broker pod. This might not use the hostnames as required by verifyHost
     verifyHost: false
     needClientAuth: true
-    # expose: true
+    expose: true
   deploymentPlan:
     extraMounts:
       secrets:

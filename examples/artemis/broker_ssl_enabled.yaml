@@ -3,13 +3,8 @@
 apiVersion: broker.amq.io/v1beta1
 kind: ActiveMQArtemis
 metadata:
-  name: ex-aao
+  name: artemis-broker
 spec:
-  # acceptors:
-  #   - name: sslacceptor
-  #     protocols: all
-  #     port: 61617
-  #     sslEnabled: true
   acceptors:
     - name: sslacceptor-all
       protocols: all
@@ -20,11 +15,10 @@ spec:
       # needClientAuth: false
       # wantClientAuth: false
       # verifyHost: false
-      # expose: True
+      expose: True
+      verifyHost: false
+      needClientAuth: true
   console:
       expose: true
       name: webconsole
       sslEnabled: false
-      # sslSecret: ex-aao-sslacceptor-secret
-  adminUser: postgres
-  adminPassword: postgres

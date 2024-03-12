@@ -22,7 +22,8 @@ spec:
       protocols: all
       port: 61616
       sslEnabled: false
-      enabledProtocols: TLSv1,TLSv1.1,TLSv1.2
+      # Enabled protocols is a TLS configuration - we have no TLS here
+      # enabledProtocols: TLSv1,TLSv1.1,TLSv1.2
       needClientAuth: false
       wantClientAuth: false
       verifyHost: false
@@ -31,5 +32,5 @@ spec:
     expose: true
     name: webconsole
     sslEnabled: False
-  adminUser: postgres
-  adminPassword: postgres
+  adminUser: admin
+  adminPassword: admin

@@ -9,16 +9,15 @@ spec:
     - name: sslacceptor-all
       protocols: all
       port: 61616
+      expose: true
       sslEnabled: true
-      sslSecret: ex-aao-sslacceptor-secret
-      # enabledProtocols: TLSv1,TLSv1.1,TLSv1.2
-      # needClientAuth: false
-      # wantClientAuth: false
+      # sslSecret: ex-aao-sslacceptor-secret
       # verifyHost: false
-      expose: True
-      verifyHost: false
-      needClientAuth: true
   console:
       expose: true
       name: webconsole
       sslEnabled: false
+  adminUser: admin
+  adminPassword: admin
+  deploymentPlan:
+    size: 1

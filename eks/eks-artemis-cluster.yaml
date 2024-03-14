@@ -13,7 +13,7 @@ metadata:
   version: '1.27'
   tags:
     karpenter.sh/discovery: ${EKS_CLUSTER_NAME}
-    created-by: eks-workshop-v2
+    created-by: anevis-solutions
     env: ${EKS_CLUSTER_NAME}
 
 # Enables OpenID Connect
@@ -36,6 +36,8 @@ addons:
   # Jobs: Allocating VPC Ip addresses to k8s nodes, configuring the networking for each pod on each node
 - name: vpc-cni
   version: 1.14.1
+  # Todo I don't know how this vpc-cni vonfiguration values affect the cluster
+  # vpc-cni is also a requirement for the AWS NLB https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/service/nlb/
   # ENABLE_PREFIX_DELEGATION = assign multiple IP addresses from a large IP address block to a network interface
   # ENABLE_POD_ENI = enables Pod Elastic Network Interface, allows to assign ENI to a Pod for network traffic isolution
   # POD_SECURITY_GROU_ENFORCING_MODE = standard = security group specified in the pod annotation withh be enforced
@@ -53,13 +55,32 @@ managedNodeGroups:
   # t2.micro is sufficient for amazonmq -> testing for artemis...
   # instanceType: t2.micro
   instanceType: t3.micro
-  # All worker nodes are launched into private subnets
-  privateNetworking: true
+  # All worker nodes are launched into private subnets ?
+  # Originally this was set to true
+  # Reference found with this video: https://www.youtube.com/watch?v=a4qdvu5cVIU
+  # And via querying in bing chat.
+  privateNetworking: false
   releaseVersion: 1.27.3-20230816
   updateConfig:
     # maximum percentage of nodes that can be unavailable during an update
     maxUnavailablePercentage: 50
+  # -------------------------------------------
+  # Removed from eksworkshop config
   # the kubernetes labels to be applied to the nodes in the node group
-  labels:
-    workshop-default: 'yes'
-
+  # labels:
+  #   workshop-default: 'yes'
+  # -------------------------------------------
+  iam:
+    withAddonPolicies:
+      # See this: https://github.com/kubernetes-sigs/external-dns
+      # This is not required, it was just interesting to experiment with this
+      externalDNS: true
+      certManager: true
+      # Replaces the following commands (during setup, see nodes):
+      # `curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.5.4/docs/install/iam_policy.json`
+      # `aws iam create-policy \
+      #       --policy-name AWSLoadBalancerControllerIAMPolicy \
+      #       --policy-document file://iam_policy.json`
+      # This does not work for some reason - https://eksctl.io/usage/iam-policies/
+      # No Idea why :(
+      awsLoadBalancerController: true

@@ -1,0 +1,22 @@
+# This file is an attempt to create a broker which is connected via a second service
+# See NLB TLS Termination: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/use_cases/nlb_tls_termination/
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: artemis-broker
+spec:
+  acceptors:
+    - name: anevis-acceptor-all
+      protocols: all
+      port: 61616
+      sslEnabled: false
+      needClientAuth: false
+      wantClientAuth: false
+      verifyHost: false
+      expose: True
+  console:
+    expose: true
+    name: webconsole
+    sslEnabled: False
+  adminUser: admin
+  adminPassword: admin

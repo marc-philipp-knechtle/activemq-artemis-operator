@@ -6,14 +6,16 @@ metadata:
   name: artemis-broker
 spec:
   acceptors:
-    - name: sslacceptor-all
+    - name: sslacceptor
       protocols: all
       port: 61616
       expose: true
       sslEnabled: true
-      # sslSecret: ex-aao-sslacceptor-secret
-      # verifyHost: false
+      sslSecret: artemis-broker-sslacceptor-secret
+      # default false for acceptors
+      verifyHost: false
   console:
+      # webconsole is normally in port 8161
       expose: true
       name: webconsole
       sslEnabled: false

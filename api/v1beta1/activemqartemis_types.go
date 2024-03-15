@@ -374,6 +374,53 @@ type DeploymentPlanType struct {
 	// Specifies the Revision History Limit of the statefulset
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Revision History Limit"
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+	// Specifies the container security context
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Container Security Context"
+	ContainerSecurityContext *corev1.SecurityContext `json:"containerSecurityContext,omitempty"`
+	// Specifies additional Volumes to be attached to the broker pods
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Extra Volumes"
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
+	// Specifies mount options for extraVolumes
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Extra Mount Options"
+	ExtraVolumeMounts []corev1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+	// Specifies Extra Volume Claims Templates for the broker pods
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Extra Volume Claims Templates"
+	ExtraVolumeClaimTemplates []VolumeClaimTemplate `json:"extraVolumeClaimTemplates,omitempty"`
+}
+type VolumeClaimTemplate struct {
+	// Specifies the desired metadata of a volume claim
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Metadata"
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Specifies the desired characteristics of a volume claim
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Spec"
+	Spec corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
+}
+
+type ObjectMeta struct {
+	// Name must be unique within a namespace. Is required when creating resources, although
+	// some resources may allow a client to request the generation of an appropriate name
+	// automatically. Name is primarily intended for creation idempotence and configuration
+	// definition.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Name",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	Name string `json:"name,omitempty"`
+
+	// Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Annotations"
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Labels"
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type ResourceTemplate struct {
@@ -448,6 +495,17 @@ type StorageType struct {
 	StorageClassName string `json:"storageClassName,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=ingress;route
+type ExposeMode string
+
+var ExposeModes = struct {
+	Ingress ExposeMode
+	Route   ExposeMode
+}{
+	Ingress: "ingress",
+	Route:   "route",
+}
+
 type AcceptorType struct {
 	// The acceptor name
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Name",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
@@ -488,6 +546,9 @@ type AcceptorType struct {
 	// Whether or not to expose this acceptor
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Expose",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	Expose bool `json:"expose,omitempty"`
+	// Mode to expose the acceptor. Currently the supported modes are `route` and `ingress`. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the acceptor.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the acceptor with TLS passthrough.\n"
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Expose Mode",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	ExposeMode *ExposeMode `json:"exposeMode,omitempty"`
 	// To indicate which kind of routing type to use.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Anycast Prefix",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	AnycastPrefix string `json:"anycastPrefix,omitempty"`
@@ -518,7 +579,7 @@ type AcceptorType struct {
 	// Provider used for the truststore; "SUN", "SunJCE", etc. Default in broker is null
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="TrustStore Provider",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	TrustStoreProvider string `json:"trustStoreProvider,omitempty"`
-	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
+	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
 }
@@ -566,6 +627,9 @@ type ConnectorType struct {
 	// Whether or not to expose this connector
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Expose",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	Expose bool `json:"expose,omitempty"`
+	// Mode to expose the connector. Currently the supported modes are `route` and `ingress`. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the connector.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the connector with TLS passthrough.\n"
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Expose Mode",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	ExposeMode *ExposeMode `json:"exposeMode,omitempty"`
 	// Provider used for the keystore; "SUN", "SunJCE", etc. Default is null
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="KeyStore Provider",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	KeyStoreProvider string `json:"keyStoreProvider,omitempty"`
@@ -575,7 +639,7 @@ type ConnectorType struct {
 	// Provider used for the truststore; "SUN", "SunJCE", etc. Default in broker is null
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="TrustStore Provider",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	TrustStoreProvider string `json:"trustStoreProvider,omitempty"`
-	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
+	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
 }
@@ -587,6 +651,9 @@ type ConsoleType struct {
 	// Whether or not to expose this port
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Expose",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	Expose bool `json:"expose,omitempty"`
+	// Mode to expose the console. Currently the supported modes are `route` and `ingress`. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the console.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the console with TLS passthrough.\n"
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Expose Mode",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	ExposeMode *ExposeMode `json:"exposeMode,omitempty"`
 	// Whether or not to enable SSL on this port
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="SSL Enabled",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	SSLEnabled bool `json:"sslEnabled,omitempty"`
@@ -596,7 +663,7 @@ type ConsoleType struct {
 	// If the embedded server requires client authentication
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Use Client Auth",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	UseClientAuth bool `json:"useClientAuth,omitempty"`
-	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
+	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
 }
@@ -729,10 +796,13 @@ const (
 	ValidConditionMissingResourcesReason = "MissingDependentResources"
 	ValidConditionInvalidVersionReason   = "SpecVersionInvalid"
 
-	ValidConditionPDBNonNilSelectorReason     = "PodDisruptionBudgetNonNilSelector"
-	ValidConditionFailedReservedLabelReason   = "ReservedLabelReference"
-	ValidConditionFailedExtraMountReason      = "InvalidExtraMount"
-	ValidConditionFailedDuplicateAcceptorPort = "DuplicateAcceptorPort"
+	ValidConditionPDBNonNilSelectorReason              = "PodDisruptionBudgetNonNilSelector"
+	ValidConditionFailedReservedLabelReason            = "ReservedLabelReference"
+	ValidConditionFailedExtraMountReason               = "InvalidExtraMount"
+	ValidConditionFailedDuplicateAcceptorPort          = "DuplicateAcceptorPort"
+	ValidConditionFailedAcceptorWithInvalidExposeMode  = "AcceptorWithInvalidExposeMode"
+	ValidConditionFailedConnectorWithInvalidExposeMode = "ConnectorWithInvalidExposeMode"
+	ValidConditionFailedConsoleWithInvalidExposeMode   = "ConsoelWithInvalidExposeMode"
 
 	ReadyConditionType      = "Ready"
 	ReadyConditionReason    = "ResourceReady"
@@ -747,4 +817,8 @@ const (
 	ConfigAppliedConditionUnknownReason                   = "UnableToRetrieveStatus"
 	ConfigAppliedConditionOutOfSyncReason                 = "OutOfSync"
 	ConfigAppliedConditionNoJolokiaClientsAvailableReason = "NoJolokiaClientsAvailable"
+
+	BrokerVersionAlignedConditionType           = "BrokerVersionAligned"
+	BrokerVersionAlignedConditionMatchReason    = "VersionMatch"
+	BrokerVersionAlignedConditionMismatchReason = "VersionMismatch"
 )

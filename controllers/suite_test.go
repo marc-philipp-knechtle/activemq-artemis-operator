@@ -19,14 +19,18 @@ package controllers
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"go.uber.org/zap/zapcore"
 
@@ -34,6 +38,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -57,9 +62,11 @@ import (
 
 	//+kubebuilder:scaffold:imports
 
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/ingresses"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,8 +78,9 @@ import (
 
 // Define utility constants for object names and testing timeouts/durations and intervals.
 const (
-	defaultNamespace        = "default"
+	defaultNamespace        = "test"
 	otherNamespace          = "other"
+	restrictedNamespace     = "restricted"
 	timeout                 = time.Second * 30
 	duration                = time.Second * 10
 	interval                = time.Millisecond * 500
@@ -96,6 +104,9 @@ var (
 
 	// the cluster url
 	clusterUrl *url.URL
+
+	// the cluster ingress host
+	clusterIngressHost string
 
 	// the manager may be stopped/restarted via tests
 	managerCtx    context.Context
@@ -124,6 +135,9 @@ var (
 	isOpenshift                    = false
 	isIngressSSLPassthroughEnabled = false
 	verbose                        = false
+	kubeTool                       = "kubectl"
+	defaultOperatorInstalled       = true
+	defaultUid                     = int64(185)
 )
 
 func init() {
@@ -163,7 +177,9 @@ func setUpEnvTest() {
 
 	setUpK8sClient()
 
-	setUpIngressSSLPassthrough()
+	setUpIngress()
+
+	setUpNamespace()
 
 	setUpTestProxy()
 
@@ -172,12 +188,41 @@ func setUpEnvTest() {
 	createControllerManagerForSuite()
 }
 
-func setUpIngressSSLPassthrough() {
-	isIngressSSLPassthroughEnabled = false
+func setUpNamespace() {
+	testNamespace := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      defaultNamespace,
+			Namespace: defaultNamespace,
+		},
+		Spec: corev1.NamespaceSpec{},
+	}
+
+	err := k8sClient.Create(ctx, &testNamespace)
+	Expect(err == nil || errors.IsConflict(err))
 
 	if isOpenshift {
+		testNamespaceKey := types.NamespacedName{Name: defaultNamespace}
+		Expect(k8sClient.Get(ctx, testNamespaceKey, &testNamespace)).Should(Succeed())
+		uidRange := testNamespace.Annotations["openshift.io/sa.scc.uid-range"]
+		uidRangeTokens := strings.Split(uidRange, "/")
+		defaultUid, err = strconv.ParseInt(uidRangeTokens[0], 10, 64)
+		Expect(err).Should(Succeed())
+	}
+}
+
+func setUpIngress() {
+	ingressConfig := &configv1.Ingress{}
+	ingressConfigKey := types.NamespacedName{Name: "cluster"}
+	ingressConfigErr := k8sClient.Get(ctx, ingressConfigKey, ingressConfig)
+
+	if ingressConfigErr == nil {
+		isOpenshift = true
 		isIngressSSLPassthroughEnabled = true
+		clusterIngressHost = "ingress." + ingressConfig.Spec.Domain
 	} else {
+		isOpenshift = false
+		isIngressSSLPassthroughEnabled = false
+		clusterIngressHost = clusterUrl.Hostname()
 		ingressNginxControllerDeployment := &appsv1.Deployment{}
 		ingressNginxControllerDeploymentKey := types.NamespacedName{Name: "ingress-nginx-controller", Namespace: "ingress-nginx"}
 		err := k8sClient.Get(ctx, ingressNginxControllerDeploymentKey, ingressNginxControllerDeployment)
@@ -208,15 +253,20 @@ func setUpIngressSSLPassthrough() {
 func setUpTestProxy() {
 
 	var err error
-	var testProxyPort int32 = 3128
-	var testProxyNodePort int32 = 30128
-	var testProxyDeploymentReplicas int32 = 1
+	testProxyPort := int32(3129)
+	testProxyDeploymentReplicas := int32(1)
+	testProxyName := "test-proxy"
+	testProxyNamespace := "default"
+	testProxyHost := testProxyName + ".tests.artemiscloud.io"
 	testProxyLabels := map[string]string{"app": "test-proxy"}
+	testProxyScript := fmt.Sprintf("openssl req -newkey rsa:2048 -nodes -keyout %[1]s -x509 -days 365 -out %[2]s -subj '/CN=test-proxy' && "+
+		"echo 'https_port %[3]d tls-cert=%[2]s tls-key=%[1]s' >> %[4]s && "+"entrypoint.sh -f %[4]s -NYC",
+		"/etc/squid/key.pem", "/etc/squid/certificate.pem", 3129, "/etc/squid/squid.conf")
 
 	testProxyDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-proxy",
-			Namespace: defaultNamespace,
+			Name:      testProxyName + "-dep",
+			Namespace: testProxyNamespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -230,8 +280,9 @@ func setUpTestProxy() {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "ningx",
-							Image: "ubuntu/squid:edge",
+							Name:    "ningx",
+							Image:   "ubuntu/squid:edge",
+							Command: []string{"sh", "-c", testProxyScript},
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: testProxyPort,
@@ -250,17 +301,15 @@ func setUpTestProxy() {
 
 	testProxyService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-proxy",
-			Namespace: defaultNamespace,
+			Name:      testProxyName + "-dep-svc",
+			Namespace: testProxyNamespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeNodePort,
 			Selector: testProxyLabels,
 			Ports: []corev1.ServicePort{
 				{
 					Port:       testProxyPort,
 					TargetPort: intstr.IntOrString{IntVal: testProxyPort},
-					NodePort:   testProxyNodePort,
 				},
 			},
 		},
@@ -269,19 +318,39 @@ func setUpTestProxy() {
 	err = k8sClient.Create(ctx, &testProxyService)
 	Expect(err != nil || errors.IsConflict(err))
 
-	proxyUrl, err := url.Parse(fmt.Sprintf("http://%s:%d", clusterUrl.Hostname(), testProxyNodePort))
+	testProxyIngress := ingresses.NewIngressForCRWithSSL(
+		nil, types.NamespacedName{Name: testProxyName, Namespace: testProxyNamespace},
+		map[string]string{}, testProxyName+"-dep-svc", strconv.FormatInt(int64(testProxyPort), 10),
+		true, "", testProxyHost, isOpenshift)
+
+	err = k8sClient.Create(ctx, testProxyIngress)
+	Expect(err != nil || errors.IsConflict(err))
+
+	proxyUrl, err := url.Parse(fmt.Sprintf("https://%s:%d", testProxyHost, 443))
 	Expect(err).NotTo(HaveOccurred())
 
-	http.DefaultTransport = &http.Transport{Proxy: http.ProxyURL(proxyUrl)}
+	http.DefaultTransport = &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if strings.HasPrefix(addr, testProxyHost) {
+				addr = clusterIngressHost + ":443"
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+		Proxy:           http.ProxyURL(proxyUrl),
+		TLSClientConfig: &tls.Config{ServerName: testProxyHost, InsecureSkipVerify: true},
+	}
 }
 
 func cleanUpTestProxy() {
 	var err error
 
+	testProxyName := "test-proxy"
+	testProxyNamespace := "default"
+
 	testProxyDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-proxy",
-			Namespace: defaultNamespace,
+			Name:      testProxyName + "-dep",
+			Namespace: testProxyNamespace,
 		},
 	}
 
@@ -290,12 +359,22 @@ func cleanUpTestProxy() {
 
 	testProxyService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-proxy",
-			Namespace: defaultNamespace,
+			Name:      testProxyName + "-dep-svc",
+			Namespace: testProxyNamespace,
 		},
 	}
 
 	err = k8sClient.Delete(ctx, &testProxyService)
+	Expect(err != nil || errors.IsNotFound(err))
+
+	testProxyIngress := netv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testProxyName + "-dep-svc-ing",
+			Namespace: testProxyNamespace,
+		},
+	}
+
+	err = k8sClient.Delete(ctx, &testProxyIngress)
 	Expect(err != nil || errors.IsNotFound(err))
 }
 
@@ -314,12 +393,20 @@ func createControllerManager(disableMetrics bool, watchNamespace string) {
 	isLocal, watchList := common.ResolveWatchNamespaceForManager(defaultNamespace, watchNamespace)
 	if isLocal {
 		ctrl.Log.Info("setting up operator to watch local namespace")
-		mgrOptions.Namespace = defaultNamespace
+		mgrOptions.Cache.DefaultNamespaces = map[string]cache.Config{
+			defaultNamespace: {}}
 	} else {
-		mgrOptions.Namespace = ""
 		if watchList != nil {
-			ctrl.Log.Info("setting up operator to watch multiple namespaces", "namespace(s)", watchList)
-			mgrOptions.NewCache = cache.MultiNamespacedCacheBuilder(watchList)
+			if len(watchList) == 1 {
+				ctrl.Log.Info("setting up operator to watch single namespace")
+			} else {
+				ctrl.Log.Info("setting up operator to watch multiple namespaces", "namespace(s)", watchList)
+			}
+			nsMap := map[string]cache.Config{}
+			for _, ns := range watchList {
+				nsMap[ns] = cache.Config{}
+			}
+			mgrOptions.Cache.DefaultNamespaces = nsMap
 		} else {
 			ctrl.Log.Info("setting up operator to watch all namespaces")
 		}
@@ -327,7 +414,7 @@ func createControllerManager(disableMetrics bool, watchNamespace string) {
 
 	if disableMetrics {
 		// if we can shutdown metrics port, we don't need disable it.
-		mgrOptions.MetricsBindAddress = "0"
+		mgrOptions.Metrics.BindAddress = "0"
 	}
 
 	waitforever := time.Duration(-1)
@@ -347,7 +434,12 @@ func createControllerManager(disableMetrics bool, watchNamespace string) {
 		autodetect.DetectOpenshift()
 	}
 
-	isOpenshift, _ = common.DetectOpenshift()
+	isOpenshift, err = common.DetectOpenshift()
+	Expect(err).NotTo(HaveOccurred())
+
+	if isOpenshift {
+		kubeTool = "oc"
+	}
 
 	brokerReconciler = &ActiveMQArtemisReconciler{
 		Client: k8Manager.GetClient(),
@@ -410,6 +502,8 @@ func setUpRealOperator() {
 
 	setUpK8sClient()
 
+	setUpNamespace()
+
 	ctrl.Log.Info("Installing CRDs")
 	crds := []string{"../deploy/crds"}
 	options := envtest.CRDInstallOptions{
@@ -419,28 +513,37 @@ func setUpRealOperator() {
 	_, err = envtest.InstallCRDs(restConfig, options)
 	Expect(err).To(Succeed())
 
-	err = installOperator(nil)
+	err = installOperator(nil, defaultNamespace)
 	Expect(err).To(Succeed(), "failed to install operator")
 }
 
 // Deploy operator resources
 // TODO: provide 'watch all namespaces' option
-func installOperator(envMap map[string]string) error {
-	ctrl.Log.Info("#### Installing Operator ####")
+func installOperator(envMap map[string]string, namespace string) error {
+	ctrl.Log.Info("#### Installing Operator ####", "ns", namespace)
 	for _, res := range oprRes {
-		if err := installYamlResource(res, envMap); err != nil {
+		if err := installYamlResource(res, envMap, namespace); err != nil {
 			return err
 		}
 	}
 
-	return waitForOperator()
+	if namespace == defaultNamespace {
+		defaultOperatorInstalled = true
+	}
+
+	return waitForOperator(namespace)
 }
 
-func uninstallOperator(deleteCrds bool) error {
-	ctrl.Log.Info("#### Uninstalling Operator ####")
-	for _, res := range oprRes {
-		if err := uninstallYamlResource(res); err != nil {
-			return err
+func uninstallOperator(deleteCrds bool, namespace string) error {
+	ctrl.Log.Info("#### Uninstalling Operator ####", "ns", namespace)
+	if namespace != defaultNamespace || defaultOperatorInstalled {
+		for _, res := range oprRes {
+			if err := uninstallYamlResource(res, namespace); err != nil {
+				return err
+			}
+		}
+		if namespace == defaultNamespace {
+			defaultOperatorInstalled = false
 		}
 	}
 
@@ -454,18 +557,21 @@ func uninstallOperator(deleteCrds bool) error {
 		}
 		return envtest.UninstallCRDs(restConfig, options)
 	}
+
 	return nil
 }
 
-func waitForOperator() error {
+func waitForOperator(namespace string) error {
 	podList := &corev1.PodList{}
+	labelSelector, err := labels.Parse("name=activemq-artemis-operator")
+	Expect(err).To(BeNil())
 	opts := &client.ListOptions{
-		Namespace: defaultNamespace,
+		Namespace:     namespace,
+		LabelSelector: labelSelector,
 	}
 
 	Eventually(func(g Gomega) {
 		g.Expect(k8sClient.List(ctx, podList, opts)).Should(Succeed())
-
 		g.Expect(len(podList.Items)).Should(BeEquivalentTo(1))
 		oprPod := podList.Items[0]
 		g.Expect(len(oprPod.Status.ContainerStatuses)).Should(BeEquivalentTo(1))
@@ -497,14 +603,14 @@ func loadYamlResource(yamlFile string) (runtime.Object, *schema.GroupVersionKind
 	return robj, gKV, nil
 }
 
-func uninstallYamlResource(resPath string) error {
+func uninstallYamlResource(resPath string, namespace string) error {
 	ctrl.Log.Info("Uninstalling yaml resource", "yaml", resPath)
 	robj, _, err := loadYamlResource(resPath)
 	if err != nil {
 		return err
 	}
 	cobj := robj.(client.Object)
-	cobj.SetNamespace(defaultNamespace)
+	cobj.SetNamespace(namespace)
 
 	err = k8sClient.Delete(ctx, cobj)
 	if err != nil {
@@ -515,14 +621,14 @@ func uninstallYamlResource(resPath string) error {
 	return nil
 }
 
-func installYamlResource(resPath string, envMap map[string]string) error {
+func installYamlResource(resPath string, envMap map[string]string, namespace string) error {
 	ctrl.Log.Info("Installing yaml resource", "yaml", resPath)
 	robj, gkv, err := loadYamlResource(resPath)
 	if err != nil {
 		return err
 	}
 	cobj := robj.(client.Object)
-	cobj.SetNamespace(defaultNamespace)
+	cobj.SetNamespace(namespace)
 
 	if gkv.Kind == "Deployment" {
 		oprObj := cobj.(*appsv1.Deployment)
@@ -547,7 +653,7 @@ func installYamlResource(resPath string, envMap map[string]string) error {
 
 	//make sure the create ok
 	Eventually(func() bool {
-		key := types.NamespacedName{Name: cobj.GetName(), Namespace: defaultNamespace}
+		key := types.NamespacedName{Name: cobj.GetName(), Namespace: namespace}
 		err := k8sClient.Get(ctx, key, cobj)
 		return err == nil
 	}, timeout, interval).Should(Equal(true))
@@ -560,7 +666,10 @@ func setUpK8sClient() {
 
 	ctrl.Log.Info("Setting up k8s client")
 
-	err := routev1.AddToScheme(scheme.Scheme)
+	err := configv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = routev1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = brokerv2alpha5.AddToScheme(scheme.Scheme)
@@ -642,7 +751,7 @@ var _ = AfterSuite(func() {
 	os.Unsetenv("OPERATOR_WATCH_NAMESPACE")
 
 	if os.Getenv("DEPLOY_OPERATOR") == "true" {
-		err := uninstallOperator(true)
+		err := uninstallOperator(true, defaultNamespace)
 		Expect(err).NotTo(HaveOccurred())
 	} else {
 		shutdownControllerManager()

@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM registry.access.redhat.com/ubi8/go-toolset:1.19 as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.20 as builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -70,4 +70,4 @@ ENTRYPOINT ["${USER_HOME}/bin/entrypoint"]
 LABEL name="artemiscloud/activemq-artemis-operator"
 LABEL description="ActiveMQ Artemis Broker Operator"
 LABEL maintainer="Roddie Kieley <rkieley@redhat.com>"
-LABEL version="1.0.16"
+LABEL version="1.1.0"

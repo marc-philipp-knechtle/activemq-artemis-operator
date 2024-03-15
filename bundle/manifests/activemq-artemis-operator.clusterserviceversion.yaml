@@ -241,7 +241,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: activemq-artemis-operator.v1.0.16
+  name: activemq-artemis-operator.v1.1.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -514,9 +514,18 @@ spec:
         path: acceptors[0].expose
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: Mode to expose the acceptor. Currently the supported modes are
+          `route` and `ingress`. Default is `route` on OpenShift and `ingress` on
+          Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the acceptor.\n*
+          `ingress` mode uses Kubernetes Nginx Ingress to expose the acceptor with
+          TLS passthrough.\n"
+        displayName: Expose Mode
+        path: acceptors[0].exposeMode
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: 'Host for Ingress and Route resources of the acceptor. It supports
           the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL),
-          $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)'
+          $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)'
         displayName: Ingress Host
         path: acceptors[0].ingressHost
         x-descriptors:
@@ -1033,6 +1042,15 @@ spec:
         path: connectors[0].expose
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: Mode to expose the connector. Currently the supported modes are
+          `route` and `ingress`. Default is `route` on OpenShift and `ingress` on
+          Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the connector.\n*
+          `ingress` mode uses Kubernetes Nginx Ingress to expose the connector with
+          TLS passthrough.\n"
+        displayName: Expose Mode
+        path: connectors[0].exposeMode
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Hostname or IP to connect to
         displayName: Host
         path: connectors[0].host
@@ -1040,7 +1058,7 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:text
       - description: 'Host for Ingress and Route resources of the acceptor. It supports
           the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL),
-          $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)'
+          $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)'
         displayName: Ingress Host
         path: connectors[0].ingressHost
         x-descriptors:
@@ -1127,9 +1145,18 @@ spec:
         path: console.expose
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: Mode to expose the console. Currently the supported modes are
+          `route` and `ingress`. Default is `route` on OpenShift and `ingress` on
+          Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the console.\n*
+          `ingress` mode uses Kubernetes Nginx Ingress to expose the console with
+          TLS passthrough.\n"
+        displayName: Expose Mode
+        path: console.exposeMode
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: 'Host for Ingress and Route resources of the acceptor. It supports
           the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL),
-          $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)'
+          $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)'
         displayName: Ingress Host
         path: console.ingressHost
         x-descriptors:
@@ -1185,6 +1212,9 @@ spec:
         path: deploymentPlan.clustered
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: Specifies the container security context
+        displayName: Container Security Context
+        path: deploymentPlan.containerSecurityContext
       - description: Whether or not to install the artemis metrics plugin
         displayName: Enable Metrics Plugin
         path: deploymentPlan.enableMetricsPlugin
@@ -1199,6 +1229,38 @@ spec:
       - description: Specifies Secret names
         displayName: Secret Names
         path: deploymentPlan.extraMounts.secrets
+      - description: Specifies Extra Volume Claims Templates for the broker pods
+        displayName: Extra Volume Claims Templates
+        path: deploymentPlan.extraVolumeClaimTemplates
+      - description: 'Annotations is an unstructured key value map stored with a resource
+          that may be set by external tools to store and retrieve arbitrary metadata.
+          They are not queryable and should be preserved when modifying objects. More
+          info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations'
+        displayName: Annotations
+        path: deploymentPlan.extraVolumeClaimTemplates[0].annotations
+      - description: 'Map of string keys and values that can be used to organize and
+          categorize (scope and select) objects. May match selectors of replication
+          controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels'
+        displayName: Labels
+        path: deploymentPlan.extraVolumeClaimTemplates[0].labels
+      - description: 'Name must be unique within a namespace. Is required when creating
+          resources, although some resources may allow a client to request the generation
+          of an appropriate name automatically. Name is primarily intended for creation
+          idempotence and configuration definition. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names'
+        displayName: Name
+        path: deploymentPlan.extraVolumeClaimTemplates[0].name
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Specifies the desired characteristics of a volume claim More
+          info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims'
+        displayName: Spec
+        path: deploymentPlan.extraVolumeClaimTemplates[0].spec
+      - description: Specifies mount options for extraVolumes
+        displayName: Extra Mount Options
+        path: deploymentPlan.extraVolumeMounts
+      - description: Specifies additional Volumes to be attached to the broker pods
+        displayName: Extra Volumes
+        path: deploymentPlan.extraVolumes
       - description: The image used for the broker, all upgrades are disabled. Needs
           a corresponding initImage
         displayName: Image
@@ -2578,6 +2640,7 @@ spec:
           selector:
             matchLabels:
               control-plane: controller-manager
+              name: activemq-artemis-operator
           strategy:
             rollingUpdate:
               maxSurge: 1
@@ -2662,6 +2725,10 @@ spec:
                   value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:ddaf00914e3a412d21ec3a814e24f3d4cc382b5c4d6c21e9b1b94dde16ddf194
                 - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2312
                   value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:81590ec33b2f00775d3c6596f610887b670de7c0b89148b09eab7584f5b0b0ec
+                - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2320
+                  value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:3bbfb6177e4839087f615a01ee54f9e06a95acaddbb083e11851b6af9315dbf0
+                - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2320
+                  value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:52f337cd5d7d5d199eebf4fc722f8c5279f652506f009efbc0f8f6de88e18718
                 - name: OPERATOR_NAME
                   valueFrom:
                     fieldRef:
@@ -2676,7 +2743,7 @@ spec:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: ENABLE_WEBHOOKS
                   value: "false"
-                image: quay.io/artemiscloud/activemq-artemis-operator:1.0.16
+                image: quay.io/artemiscloud/activemq-artemis-operator:1.1.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -2684,6 +2751,9 @@ spec:
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
+                ports:
+                - containerPort: 8383
+                  name: http-metrics
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -2693,8 +2763,16 @@ spec:
                 resources: {}
                 securityContext:
                   allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  runAsNonRoot: true
+                  seccompProfile:
+                    type: RuntimeDefault
               securityContext:
                 runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               serviceAccountName: activemq-artemis-controller-manager
               terminationGracePeriodSeconds: 10
       permissions:
@@ -2892,6 +2970,7 @@ spec:
           - delete
           - get
           - list
+          - update
           - watch
         - apiGroups:
           - policy
@@ -3028,4 +3107,8 @@ spec:
     name: activemq-artemis-broker-init-2312
   - image: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:81590ec33b2f00775d3c6596f610887b670de7c0b89148b09eab7584f5b0b0ec
     name: activemq-artemis-broker-kubernetes-2312
-  version: 1.0.16
+  - image: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:3bbfb6177e4839087f615a01ee54f9e06a95acaddbb083e11851b6af9315dbf0
+    name: activemq-artemis-broker-init-2320
+  - image: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:52f337cd5d7d5d199eebf4fc722f8c5279f652506f009efbc0f8f6de88e18718
+    name: activemq-artemis-broker-kubernetes-2320
+  version: 1.1.0

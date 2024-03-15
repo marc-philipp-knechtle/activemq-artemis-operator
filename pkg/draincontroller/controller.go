@@ -57,6 +57,7 @@ import (
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -845,6 +846,11 @@ func (c *Controller) newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, 
 				},
 			},
 		})
+	}
+
+	pod.Spec.SecurityContext = sts.Spec.Template.Spec.SecurityContext
+	for i := 0; i < len(pod.Spec.Containers); i++ {
+		pod.Spec.Containers[i].SecurityContext = sts.Spec.Template.Spec.Containers[0].SecurityContext
 	}
 
 	return &pod, nil

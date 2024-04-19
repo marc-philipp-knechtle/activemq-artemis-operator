@@ -1,24 +1,28 @@
-apiVersion: broker.amq.io/v1beta1
-kind: ActiveMQArtemis
-metadata:
-  name: artemis-springcloud
-spec:
-  deploymentPlan:
-    size: 3
-    messageMigration: true
-    resources:
-      limits:
-        cpu: "500m"
-        memory: "1024Mi"
-      requests:
-        cpu: "250m"
-        memory: "512Mi"
-  acceptors:
-    - name: amqp
-      protocols: amqp
-      port: 5672 # Expose the amqp port outside the single broker pods
-      connectionsAllowed: 5
-  # Expose the management console
-  console:
-    expose: true
+# This was modeled after a tutorial
+# This is not part of the official examples
+# Therefore it is commented and scheduled for removal if not required otherwise
 
+#apiVersion: broker.amq.io/v1beta1
+#kind: ActiveMQArtemis
+#metadata:
+#  name: artemis-springcloud
+#spec:
+#  deploymentPlan:
+#    size: 3
+#    messageMigration: true
+#    resources:
+#      limits:
+#        cpu: "500m"
+#        memory: "1024Mi"
+#      requests:
+#        cpu: "250m"
+#        memory: "512Mi"
+#  acceptors:
+#    - name: amqp
+#      protocols: amqp
+#      port: 5672 # Expose the amqp port outside the single broker pods
+#      connectionsAllowed: 5
+#  # Expose the management console
+#  console:
+#    expose: true
+#

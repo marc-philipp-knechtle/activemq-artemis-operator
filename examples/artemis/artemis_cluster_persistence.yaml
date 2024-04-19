@@ -3,6 +3,7 @@ kind: ActiveMQArtemis
 metadata:
   name: artemis-broker
 spec:
+  # version: 2.32.0
   deploymentPlan:
     size: 2
     persistenceEnabled: true

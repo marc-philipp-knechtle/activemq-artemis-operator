@@ -3,6 +3,7 @@ kind: ActiveMQArtemis
 metadata:
   name: artemis-broker
 spec:
+  # version: 2.32.0
   acceptors:
 #    This is commented since we have the console as separate item below
 #    - name: management-console

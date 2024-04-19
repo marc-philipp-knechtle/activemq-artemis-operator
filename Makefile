@@ -3,10 +3,10 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 1.1.0
+VERSION ?= 1.2.1
 
 KUBE_CLI=kubectl
-OPERATOR_VERSION := 1.1.0
+OPERATOR_VERSION := 1.2.1
 OPERATOR_ACCOUNT_NAME := activemq-artemis-operator
 OPERATOR_CLUSTER_ROLE_NAME := operator-role
 OPERATOR_IMAGE_REPO := quay.io/artemiscloud/activemq-artemis-operator
@@ -17,6 +17,14 @@ GO_MODULE := github.com/artemiscloud/activemq-artemis-operator
 OS := $(shell go env GOOS)
 ARCH := $(shell go env GOARCH)
 
+# Check that the system's go version is compatible with the one stored in the
+# go.mod file.
+RUNTIME_GO_VERSION := $(shell go version)
+REQUIRED_GO_VERSION := $(subst go ,,$(shell grep -i -e '^go .*' go.mod))
+
+ifeq (,$(findstring $(REQUIRED_GO_VERSION),$(RUNTIME_GO_VERSION)))
+$(error The go version $(RUNTIME_GO_VERSION) the system is currently running is incompatible with the required one $(REQUIRED_GO_VERSION))
+endif
 
 # directory to hold static resources for deploying operator
 DEPLOY := ./deploy
@@ -140,15 +148,15 @@ vet: ## Run go vet against code.
 test test-v: TEST_VARS = KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" RECONCILE_RESYNC_PERIOD=5s
 
 ## Run tests against minikube with local operator.
-test-mk test-mk-v: TEST_ARGS += -test.timeout=50m -ginkgo.label-filter='!do'
+test-mk test-mk-v: TEST_ARGS += -test.timeout=120m -ginkgo.label-filter='!do'
 test-mk test-mk-v: TEST_VARS = ENABLE_WEBHOOKS=false USE_EXISTING_CLUSTER=true RECONCILE_RESYNC_PERIOD=5s
 
 ## Run tests against minikube with deployed operator(do)
-test-mk-do test-mk-do-v: TEST_ARGS += -test.timeout=40m -ginkgo.label-filter='do'
+test-mk-do test-mk-do-v: TEST_ARGS += -test.timeout=60m -ginkgo.label-filter='do'
 test-mk-do test-mk-do-v: TEST_VARS = DEPLOY_OPERATOR=true ENABLE_WEBHOOKS=false USE_EXISTING_CLUSTER=true
 
 ## Run tests against minikube with deployed operator(do) and exclude slow, useful for CI smoke
-test-mk-do-fast test-mk-do-fast-v: TEST_ARGS += -test.timeout=40m -ginkgo.label-filter='do && !slow'
+test-mk-do-fast test-mk-do-fast-v: TEST_ARGS += -test.timeout=30m -ginkgo.label-filter='do && !slow'
 test-mk-do-fast test-mk-do-fast-v: TEST_VARS = DEPLOY_OPERATOR=true ENABLE_WEBHOOKS=false USE_EXISTING_CLUSTER=true
 
 test-v test-mk-v test-mk-do-v test-mk-do-fast-v: TEST_ARGS += -v
@@ -264,7 +272,9 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+## The latest envtest version of envtest doesn't work with go 1.20 because of https://github.com/kubernetes-sigs/controller-runtime/issues/2720
+## Use the command `TZ=UTC git --no-pager show --quiet --abbrev=12 --date='format-local:%Y%m%d%H%M%S' --format="%cd-%h"` to get a pseudo-version
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240215143116-d0396a3d6f9f
 
 .PHONY: bundle
 bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metadata, then validate generated files.

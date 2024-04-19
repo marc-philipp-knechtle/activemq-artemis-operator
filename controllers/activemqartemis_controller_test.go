@@ -39,6 +39,7 @@ import (
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/secrets"
 	ss "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/jolokia"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	"github.com/blang/semver/v4"
 
@@ -51,7 +52,7 @@ import (
 	"github.com/artemiscloud/activemq-artemis-operator/version"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -82,8 +83,6 @@ import (
 var _ = Describe("artemis controller", func() {
 
 	brokerPropertiesMatchString := "broker.properties"
-	defaultTestIngressDomain := "tests.artemiscloud.io"
-	ingressHostDomainSubString := "apps.artemiscloud.io"
 
 	// see what has changed from the controllers perspective, what we watch
 	toWatch := []client.ObjectList{&brokerv1beta1.ActiveMQArtemisList{}, &appsv1.StatefulSetList{}, &corev1.PodList{}}
@@ -164,6 +163,10 @@ var _ = Describe("artemis controller", func() {
 					candidate.Spec.Console.Expose = true
 					candidate.Spec.Console.SSLEnabled = true
 					candidate.Spec.Console.SSLSecret = commonSecretName
+
+					if !isOpenshift {
+						candidate.Spec.IngressDomain = defaultTestIngressDomain
+					}
 
 					candidate.Spec.Acceptors = []brokerv1beta1.AcceptorType{
 						{
@@ -301,7 +304,7 @@ var _ = Describe("artemis controller", func() {
 						g.Expect(k8sClient.Get(ctx, ingKey, &ingress)).To(Succeed())
 
 						g.Expect(len(ingress.Spec.Rules)).To(Equal(1))
-						g.Expect(ingress.Spec.Rules[0].Host).To(ContainSubstring(ingressHostDomainSubString))
+						g.Expect(ingress.Spec.Rules[0].Host).To(ContainSubstring(defaultTestIngressDomain))
 						g.Expect(len(ingress.Spec.Rules[0].HTTP.Paths)).To(BeEquivalentTo(1))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).To(BeEquivalentTo(brokerCr.Name + "-wconsj-0-svc"))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Name).To(BeEquivalentTo("wconsj-0"))
@@ -310,7 +313,7 @@ var _ = Describe("artemis controller", func() {
 
 						g.Expect(len(ingress.Spec.TLS)).To(BeEquivalentTo(1))
 						g.Expect(len(ingress.Spec.TLS[0].Hosts)).To(BeEquivalentTo(1))
-						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(ContainSubstring(ingressHostDomainSubString))
+						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(ContainSubstring(defaultTestIngressDomain))
 
 					}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
@@ -323,7 +326,7 @@ var _ = Describe("artemis controller", func() {
 						g.Expect(k8sClient.Get(ctx, ingKey, &ingress)).To(Succeed())
 
 						g.Expect(len(ingress.Spec.Rules)).To(Equal(1)) //artemis-broker-amqp-ssl-0-svc-ing.
-						g.Expect(ingress.Spec.Rules[0].Host).To(Equal(brokerCr.Name + "-amqp-ssl-0-svc-ing-" + defaultNamespace + "." + ingressHostDomainSubString))
+						g.Expect(ingress.Spec.Rules[0].Host).To(Equal(brokerCr.Name + "-amqp-ssl-0-svc-ing-" + defaultNamespace + "." + defaultTestIngressDomain))
 						g.Expect(len(ingress.Spec.Rules[0].HTTP.Paths)).To(BeEquivalentTo(1))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).To(Equal(brokerCr.Name + "-amqp-ssl-0-svc"))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Name).To(Equal("amqp-ssl-0"))
@@ -332,7 +335,7 @@ var _ = Describe("artemis controller", func() {
 
 						g.Expect(len(ingress.Spec.TLS)).To(BeEquivalentTo(1))
 						g.Expect(len(ingress.Spec.TLS[0].Hosts)).To(BeEquivalentTo(1))
-						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(Equal(brokerCr.Name + "-amqp-ssl-0-svc-ing-" + defaultNamespace + "." + ingressHostDomainSubString))
+						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(Equal(brokerCr.Name + "-amqp-ssl-0-svc-ing-" + defaultNamespace + "." + defaultTestIngressDomain))
 
 					}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
@@ -345,7 +348,7 @@ var _ = Describe("artemis controller", func() {
 						g.Expect(k8sClient.Get(ctx, ingKey, &ingress)).To(Succeed())
 
 						g.Expect(len(ingress.Spec.Rules)).To(Equal(1))
-						g.Expect(ingress.Spec.Rules[0].Host).To(Equal(brokerCr.Name + "-connector-ssl-0-svc-ing-" + defaultNamespace + "." + ingressHostDomainSubString))
+						g.Expect(ingress.Spec.Rules[0].Host).To(Equal(brokerCr.Name + "-connector-ssl-0-svc-ing-" + defaultNamespace + "." + defaultTestIngressDomain))
 						g.Expect(len(ingress.Spec.Rules[0].HTTP.Paths)).To(BeEquivalentTo(1))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).To(Equal(brokerCr.Name + "-connector-ssl-0-svc"))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Name).To(Equal("connector-ssl-0"))
@@ -354,7 +357,7 @@ var _ = Describe("artemis controller", func() {
 
 						g.Expect(len(ingress.Spec.TLS)).To(BeEquivalentTo(1))
 						g.Expect(len(ingress.Spec.TLS[0].Hosts)).To(BeEquivalentTo(1))
-						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(Equal(brokerCr.Name + "-connector-ssl-0-svc-ing-" + defaultNamespace + "." + ingressHostDomainSubString))
+						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(Equal(brokerCr.Name + "-connector-ssl-0-svc-ing-" + defaultNamespace + "." + defaultTestIngressDomain))
 
 					}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 				}
@@ -561,11 +564,11 @@ var _ = Describe("artemis controller", func() {
 						Expose: true,
 					},
 				}
+
+				if !isOpenshift {
+					candidate.Spec.IngressDomain = defaultTestIngressDomain
+				}
 			})
-
-			isOpenshift, err := common.DetectOpenshift()
-			Expect(err).To(BeNil())
-
 			By("checking the CR gets status updated")
 			brokerKey := types.NamespacedName{Name: createdBrokerCr.Name, Namespace: createdBrokerCr.Namespace}
 			Eventually(func(g Gomega) {
@@ -611,6 +614,10 @@ var _ = Describe("artemis controller", func() {
 						Port:   samePort,
 						Expose: true,
 					},
+				}
+
+				if !isOpenshift {
+					candidate.Spec.IngressDomain = defaultTestIngressDomain
 				}
 			})
 
@@ -1782,6 +1789,10 @@ var _ = Describe("artemis controller", func() {
 				}
 				candidate.Spec.Console.Expose = true
 				candidate.Spec.DeploymentPlan.JolokiaAgentEnabled = true
+
+				if !isOpenshift {
+					candidate.Spec.IngressDomain = defaultTestIngressDomain
+				}
 			})
 
 			ssKey := types.NamespacedName{
@@ -2195,8 +2206,9 @@ var _ = Describe("artemis controller", func() {
 				crd.Spec.Console.SSLEnabled = true
 				crd.Spec.Console.SSLSecret = "my-secret"
 
-				isOpenshift, err := common.DetectOpenshift()
-				Expect(err).To(BeNil())
+				if !isOpenshift {
+					crd.Spec.IngressDomain = defaultTestIngressDomain
+				}
 
 				By("deploying user specified secret")
 				consoleSecretName := "my-secret"
@@ -2269,7 +2281,7 @@ var _ = Describe("artemis controller", func() {
 						g.Expect(k8sClient.Get(ctx, ingKey, &ingress)).To(Succeed())
 
 						g.Expect(len(ingress.Spec.Rules)).To(Equal(1))
-						g.Expect(ingress.Spec.Rules[0].Host).To(ContainSubstring(ingressHostDomainSubString))
+						g.Expect(ingress.Spec.Rules[0].Host).To(ContainSubstring(defaultTestIngressDomain))
 						g.Expect(len(ingress.Spec.Rules[0].HTTP.Paths)).To(BeEquivalentTo(1))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).To(BeEquivalentTo(crd.Name + "-wconsj-0-svc"))
 						g.Expect(ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Name).To(BeEquivalentTo("wconsj-0"))
@@ -2278,7 +2290,7 @@ var _ = Describe("artemis controller", func() {
 
 						g.Expect(len(ingress.Spec.TLS)).To(BeEquivalentTo(1))
 						g.Expect(len(ingress.Spec.TLS[0].Hosts)).To(BeEquivalentTo(1))
-						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(ContainSubstring(ingressHostDomainSubString))
+						g.Expect(ingress.Spec.TLS[0].Hosts[0]).To(ContainSubstring(defaultTestIngressDomain))
 
 					}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 				}
@@ -2305,8 +2317,6 @@ var _ = Describe("artemis controller", func() {
 		It("expose with ingress mode", Label("console", "acceptor", "connector", "ingress"), func() {
 			By("Deploying a broker with console")
 			brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
-				candidate.Spec.IngressDomain = defaultTestIngressDomain
-
 				candidate.Spec.Console.Expose = true
 				candidate.Spec.Console.ExposeMode = &brokerv1beta1.ExposeModes.Ingress
 
@@ -2327,7 +2337,67 @@ var _ = Describe("artemis controller", func() {
 						ExposeMode: &brokerv1beta1.ExposeModes.Ingress,
 					},
 				}
+
+				// force a non-fatal failure for the validation of the broker images
+				candidate.Spec.DeploymentPlan.Image = version.LatestKubeImage
+				candidate.Spec.Version = ""
 			})
+
+			brokerKey := types.NamespacedName{Name: brokerCr.Name, Namespace: brokerCr.Namespace}
+			deployedCrd := &brokerv1beta1.ActiveMQArtemis{}
+
+			By("verify acceptor with invalid ingress settings")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, deployedCrd)).Should(Succeed())
+				g.Expect(meta.IsStatusConditionTrue(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)).Should(BeFalse())
+
+				validation := meta.FindStatusCondition(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
+				g.Expect(validation).ShouldNot(BeNil())
+				g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedInvalidIngressSettings))
+				g.Expect(validation.Message).Should(ContainSubstring(".Spec.Acceptors \"acceptor\" has invalid ingress settings, IngressHost unspecified and no Spec.IngressDomain default domain provided"))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, deployedCrd)).Should(Succeed())
+				deployedCrd.Spec.Acceptors[0].IngressHost = "acceptor." + defaultTestIngressDomain
+				g.Expect(k8sClient.Update(ctx, deployedCrd)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			By("verify connector with invalid ingress settings")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, deployedCrd)).Should(Succeed())
+				g.Expect(meta.IsStatusConditionTrue(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)).Should(BeFalse())
+
+				validation := meta.FindStatusCondition(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
+				g.Expect(validation).ShouldNot(BeNil())
+				g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedInvalidIngressSettings))
+				g.Expect(validation.Message).Should(ContainSubstring(".Spec.Connectors \"connector\" has invalid ingress settings, IngressHost unspecified and no Spec.IngressDomain default domain provided"))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, deployedCrd)).Should(Succeed())
+				deployedCrd.Spec.Connectors[0].IngressHost = "connector." + defaultTestIngressDomain
+				g.Expect(k8sClient.Update(ctx, deployedCrd)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			By("verify console with invalid ingress settings")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, deployedCrd)).Should(Succeed())
+				g.Expect(meta.IsStatusConditionTrue(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)).Should(BeFalse())
+
+				validation := meta.FindStatusCondition(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
+				g.Expect(validation).ShouldNot(BeNil())
+				g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedInvalidIngressSettings))
+				g.Expect(validation.Message).Should(ContainSubstring(".Spec.Console has invalid ingress settings, IngressHost unspecified and no Spec.IngressDomain default domain provided"))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, deployedCrd)).Should(Succeed())
+				deployedCrd.Spec.Acceptors[0].IngressHost = ""
+				deployedCrd.Spec.Connectors[0].IngressHost = ""
+				deployedCrd.Spec.IngressDomain = defaultTestIngressDomain
+				g.Expect(k8sClient.Update(ctx, deployedCrd)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
 
 			By("check ingress is created for console")
 			ingKey := types.NamespacedName{
@@ -2349,7 +2419,7 @@ var _ = Describe("artemis controller", func() {
 			}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
 			if isOpenshift || isIngressSSLPassthroughEnabled {
-				host := ingress.Name + "-" + defaultNamespace + "." + brokerCr.Spec.IngressDomain
+				host := ingress.Name + "-" + defaultNamespace + "." + deployedCrd.Spec.IngressDomain
 
 				By("check console is reachable")
 				httpClient := http.Client{Timeout: timeout, Transport: &http.Transport{
@@ -2634,7 +2704,7 @@ var _ = Describe("artemis controller", func() {
 
 					validation := meta.FindStatusCondition(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
 					g.Expect(validation).ShouldNot(BeNil())
-					g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedAcceptorWithInvalidExposeMode))
+					g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedInvalidExposeMode))
 					g.Expect(validation.Message).Should(ContainSubstring(".Spec.Acceptors \"acceptor\" has invalid expose mode route, it is only supported on OpenShift"))
 				}, timeout, interval).Should(Succeed())
 
@@ -2651,7 +2721,7 @@ var _ = Describe("artemis controller", func() {
 
 					validation := meta.FindStatusCondition(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
 					g.Expect(validation).ShouldNot(BeNil())
-					g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedConnectorWithInvalidExposeMode))
+					g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedInvalidExposeMode))
 					g.Expect(validation.Message).Should(ContainSubstring(".Spec.Connectors \"connector\" has invalid expose mode route, it is only supported on OpenShift"))
 				}, timeout, interval).Should(Succeed())
 
@@ -2668,7 +2738,7 @@ var _ = Describe("artemis controller", func() {
 
 					validation := meta.FindStatusCondition(deployedCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
 					g.Expect(validation).ShouldNot(BeNil())
-					g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedConsoleWithInvalidExposeMode))
+					g.Expect(validation.Reason).Should(Equal(brokerv1beta1.ValidConditionFailedInvalidExposeMode))
 					g.Expect(validation.Message).Should(ContainSubstring(".Spec.Console has invalid expose mode route, it is only supported on OpenShift"))
 				}, timeout, interval).Should(Succeed())
 			}
@@ -2688,6 +2758,10 @@ var _ = Describe("artemis controller", func() {
 
 		crd.Spec.Console.Expose = true
 		crd.Spec.Console.SSLEnabled = true
+
+		if !isOpenshift {
+			crd.Spec.IngressDomain = defaultTestIngressDomain
+		}
 
 		By("Deploying broker" + crd.Name)
 		Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
@@ -3658,6 +3732,17 @@ var _ = Describe("artemis controller", func() {
 			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log, k8sClient.Scheme())
 
 			defaultConsoleSecretName := crd.Name + "-console-secret"
+			tlsSecret, err := CreateTlsSecret(defaultConsoleSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, tlsSecret)).To(Succeed())
+
+			By("veryify secret exists")
+			createdTlsSecret := &corev1.Secret{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: tlsSecret.Name, Namespace: tlsSecret.Namespace}, createdTlsSecret)).Should(Succeed())
+				g.Expect(createdTlsSecret.ResourceVersion).ShouldNot(BeEmpty())
+			}, timeout*2, interval).Should(Succeed())
+
 			currentSS := &appsv1.StatefulSet{}
 			currentSS.Name = namer.CrToSS(crd.Name)
 			currentSS.Namespace = defaultNamespace
@@ -3669,7 +3754,7 @@ var _ = Describe("artemis controller", func() {
 			}}
 
 			namer := MakeNamers(&crd)
-			reconcilerImpl.ProcessConsole(&crd, *namer, brokerReconciler.Client, brokerReconciler.Scheme, currentSS)
+			Expect(reconcilerImpl.ProcessConsole(&crd, *namer, brokerReconciler.Client, brokerReconciler.Scheme, currentSS)).Should(Succeed())
 
 			secretName := namer.SecretsConsoleNameBuilder.Name()
 			internalSecretName := secretName + "-internal"
@@ -3679,7 +3764,7 @@ var _ = Describe("artemis controller", func() {
 			foundInternalSecret := false
 			defaultSecretPath := "/etc/" + defaultConsoleSecretName + "-volume/"
 			defaultSslArgs := " --ssl-key " + defaultSecretPath + "broker.ks --ssl-key-password password --ssl-trust " + defaultSecretPath + "client.ts --ssl-trust-password password"
-			for _, reqres := range reconcilerImpl.requestedResources {
+			for _, reqres := range common.ToResourceList(reconcilerImpl.requestedResources) {
 				if reqres.GetObjectKind().GroupVersionKind().Kind == "Secret" {
 					secret := reqres.(*corev1.Secret)
 					if secret.Name == secretName {
@@ -3709,6 +3794,7 @@ var _ = Describe("artemis controller", func() {
 			}
 			Expect(foundSecretRef).To(BeTrue())
 			Expect(foundSecretKey).To(BeTrue())
+			CleanResource(tlsSecret, tlsSecret.Name, tlsSecret.Namespace)
 		})
 
 		It("reconcile verify internal secret owner ref", func() {
@@ -3738,6 +3824,11 @@ var _ = Describe("artemis controller", func() {
 			reconcilerImpl := NewActiveMQArtemisReconcilerImpl(&crd, ctrl.Log, k8sClient.Scheme())
 			namer := MakeNamers(&crd)
 			defaultConsoleSecretName := crd.Name + "-console-secret"
+
+			tlsSecret, err := CreateTlsSecret(defaultConsoleSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, tlsSecret)).To(Succeed())
+
 			internalSecretName := defaultConsoleSecretName + "-internal"
 			internalConsoleSecretKey := types.NamespacedName{Namespace: crd.Namespace, Name: internalSecretName}
 
@@ -3841,6 +3932,10 @@ var _ = Describe("artemis controller", func() {
 			internalSecretName := defaultConsoleSecretName + "-internal"
 			internalConsoleSecretKey := types.NamespacedName{Namespace: crd.Namespace, Name: internalSecretName}
 
+			tlsSecret, err := CreateTlsSecret(defaultConsoleSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, tlsSecret)).To(Succeed())
+
 			By("making abandoned internal secret")
 			createdInternalSecret := &corev1.Secret{}
 			createdInternalSecret.Name = internalConsoleSecretKey.Name
@@ -3877,6 +3972,7 @@ var _ = Describe("artemis controller", func() {
 			By("cleanup")
 			k8sClient.Delete(ctx, createdInternalSecret)
 			k8sClient.Delete(ctx, createdCrd)
+			CleanResource(tlsSecret, tlsSecret.Name, tlsSecret.Namespace)
 		})
 	})
 
@@ -5871,7 +5967,7 @@ var _ = Describe("artemis controller", func() {
 			// it requires the key to be logging.properties
 			loggingData["logging-configuration"] = "someproperty=somevalue"
 			loggingSecretKey := types.NamespacedName{Name: loggingSecretName, Namespace: defaultNamespace}
-			loggingSecret := secrets.NewSecret(loggingSecretKey, loggingSecretName, loggingData, nil)
+			loggingSecret := secrets.NewSecret(loggingSecretKey, loggingData, nil)
 			Eventually(func() bool {
 				err := k8sClient.Create(ctx, loggingSecret, &client.CreateOptions{})
 				return err == nil
@@ -6034,7 +6130,7 @@ var _ = Describe("artemis controller", func() {
 
 			loggingData := make(map[string]string)
 			loggingData[LoggingConfigKey] = "someproperty=somevalue"
-			secret := secrets.NewSecret(types.NamespacedName{Name: loggingSecretName, Namespace: defaultNamespace}, loggingSecretName, loggingData, nil)
+			secret := secrets.NewSecret(types.NamespacedName{Name: loggingSecretName, Namespace: defaultNamespace}, loggingData, nil)
 			Eventually(func() bool {
 				err := k8sClient.Create(ctx, secret, &client.CreateOptions{})
 				return err == nil
@@ -6287,8 +6383,8 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			// cleanup
-			Expect(k8sClient.Delete(ctx, createdCrd)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, createdAddressCr)).Should(Succeed())
+			CleanResource(createdCrd, createdCrd.Name, createdCrd.Namespace)
+			CleanResource(createdAddressCr, createdAddressCr.Name, createdAddressCr.Namespace)
 		})
 	})
 
@@ -6393,8 +6489,8 @@ var _ = Describe("artemis controller", func() {
 			// the broker init images before 2.32.0 has root user
 			// that doesn't work in namespaces with the restricted policy
 			crd.Spec.DeploymentPlan.PodSecurityContext = &corev1.PodSecurityContext{
-				RunAsUser:      utilpointer.Int64(defaultUid),
-				RunAsNonRoot:   utilpointer.Bool(true),
+				RunAsUser:      ptr.To(defaultUid),
+				RunAsNonRoot:   ptr.To(true),
 				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			}
 
@@ -6746,6 +6842,10 @@ var _ = Describe("artemis controller", func() {
 						crd.Spec.Acceptors[0].Expose = true
 						crd.Spec.Connectors[0].Expose = true
 
+						if !isOpenshift {
+							crd.Spec.IngressDomain = defaultTestIngressDomain
+						}
+
 						err = k8sClient.Update(ctx, &crd)
 					}
 					return err == nil
@@ -6796,6 +6896,16 @@ var _ = Describe("artemis controller", func() {
 				}
 
 				By("updating with expose=true and tls")
+				sslSecretName := crd.Name + "-" + crd.Spec.Acceptors[0].Name + "-secret"
+				sslSecret, err := CreateTlsSecret(sslSecretName, defaultNamespace, "password", nil)
+				Expect(err).To(BeNil())
+				Expect(k8sClient.Create(ctx, sslSecret)).Should(Succeed())
+
+				sslSecretName1 := crd.Name + "-" + crd.Spec.Connectors[0].Name + "-secret"
+				sslSecret1, err := CreateTlsSecret(sslSecretName1, defaultNamespace, "password", nil)
+				Expect(err).To(BeNil())
+				Expect(k8sClient.Create(ctx, sslSecret1)).Should(Succeed())
+
 				Eventually(func(g Gomega) {
 					key := types.NamespacedName{Name: crd.Name, Namespace: defaultNamespace}
 					g.Expect(k8sClient.Get(ctx, key, &crd)).Should(Succeed())
@@ -6848,6 +6958,8 @@ var _ = Describe("artemis controller", func() {
 				}
 
 				CleanResource(&crd, crd.Name, defaultNamespace)
+				CleanResource(sslSecret, sslSecret.Name, defaultNamespace)
+				CleanResource(sslSecret1, sslSecret1.Name, defaultNamespace)
 			}
 		})
 	})
@@ -7159,14 +7271,19 @@ var _ = Describe("artemis controller", func() {
 				Size: common.Int32ToPtr(1),
 			}
 			keyStoreProvider := "SunJCE"
+			acceptorName := "new-acceptor"
 			cr.Spec.Acceptors = []brokerv1beta1.AcceptorType{
 				{
-					Name:             "new-acceptor",
+					Name:             acceptorName,
 					Port:             61666,
 					SSLEnabled:       true,
 					KeyStoreProvider: keyStoreProvider,
 				},
 			}
+			sslSecretName := cr.Name + "-" + acceptorName + "-secret"
+			sslSecret, err := CreateTlsSecret(sslSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, sslSecret)).Should(Succeed())
 			Expect(k8sClient.Create(ctx, &cr)).Should(Succeed())
 
 			ssNamespacedName := types.NamespacedName{Name: namer.CrToSS(cr.Name), Namespace: defaultNamespace}
@@ -7197,6 +7314,7 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			CleanResource(&cr, cr.Name, defaultNamespace)
+			CleanResource(sslSecret, sslSecret.Name, defaultNamespace)
 		})
 
 		It("Testing acceptor trustStoreType being set and unset", func() {
@@ -7208,6 +7326,7 @@ var _ = Describe("artemis controller", func() {
 				Size: common.Int32ToPtr(1),
 			}
 			trustStoreType := "JCEKS"
+			acceptorName := "new-acceptor"
 			cr.Spec.Acceptors = []brokerv1beta1.AcceptorType{
 				{
 					Name:           "new-acceptor",
@@ -7216,6 +7335,10 @@ var _ = Describe("artemis controller", func() {
 					TrustStoreType: trustStoreType,
 				},
 			}
+			sslSecretName := cr.Name + "-" + acceptorName + "-secret"
+			sslSecret, err := CreateTlsSecret(sslSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, sslSecret)).Should(Succeed())
 			Expect(k8sClient.Create(ctx, &cr)).Should(Succeed())
 
 			ssResourceVersionWithSslEnabled := ""
@@ -7299,6 +7422,7 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			CleanResource(&cr, cr.Name, defaultNamespace)
+			CleanResource(sslSecret, sslSecret.Name, defaultNamespace)
 		})
 
 		It("Testing acceptor trustStoreProvider being set", func() {
@@ -7310,6 +7434,7 @@ var _ = Describe("artemis controller", func() {
 				Size: common.Int32ToPtr(1),
 			}
 			trustStoreProvider := "SUN"
+			acceptorName := "new-acceptor"
 			cr.Spec.Acceptors = []brokerv1beta1.AcceptorType{
 				{
 					Name:               "new-acceptor",
@@ -7318,6 +7443,11 @@ var _ = Describe("artemis controller", func() {
 					TrustStoreProvider: trustStoreProvider,
 				},
 			}
+			sslSecretName := cr.Name + "-" + acceptorName + "-secret"
+			sslSecret, err := CreateTlsSecret(sslSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, sslSecret)).Should(Succeed())
+
 			Expect(k8sClient.Create(ctx, &cr)).Should(Succeed())
 
 			ssNamespacedName := types.NamespacedName{Name: namer.CrToSS(cr.Name), Namespace: defaultNamespace}
@@ -7347,6 +7477,7 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			CleanResource(&cr, cr.Name, defaultNamespace)
+			CleanResource(sslSecret, sslSecret.Name, defaultNamespace)
 		})
 	})
 
@@ -8005,6 +8136,10 @@ var _ = Describe("artemis controller", func() {
 		crd.Spec.BrokerProperties = []string{
 			"metricsConfiguration.jvmGc=true",
 			"metricsConfiguration.jvmThread=true",
+		}
+
+		if !isOpenshift {
+			crd.Spec.IngressDomain = defaultTestIngressDomain
 		}
 
 		By("Deploying the CRD " + crd.ObjectMeta.Name)
@@ -8857,6 +8992,117 @@ var _ = Describe("artemis controller", func() {
 			Expect(k8sClient.Delete(ctx, &crd)).To(Succeed())
 		})
 
+		It("CR.brokerProperties and -bp duplicate validation", func() {
+
+			ctx := context.Background()
+			crd := generateArtemisSpec(defaultNamespace)
+
+			secret := &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "k8s.io.api.core.v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "v-bp",
+					Namespace: crd.ObjectMeta.Namespace,
+				},
+			}
+
+			secret.StringData = map[string]string{"a.properties": "journalMinFiles=10\njournalMinFiles=20"}
+
+			crd.Spec.DeploymentPlan.ExtraMounts.Secrets = []string{secret.Name}
+
+			By("Deploying the secret " + secret.ObjectMeta.Name)
+			Expect(k8sClient.Create(ctx, secret)).Should(Succeed())
+
+			By("Deploying the CRD " + crd.ObjectMeta.Name)
+			Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+			By("verifying invalid via status")
+			createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+			brokerKey := types.NamespacedName{Name: crd.Name, Namespace: crd.Namespace}
+			Eventually(func(g Gomega) {
+
+				g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+
+				g.Expect(meta.IsStatusConditionFalse(createdCrd.Status.Conditions, brokerv1beta1.ReadyConditionType)).Should(BeTrue())
+				g.Expect(meta.IsStatusConditionPresentAndEqual(createdCrd.Status.Conditions, brokerv1beta1.DeployedConditionType, metav1.ConditionFalse)).Should(BeTrue())
+
+				deployedCondition := meta.FindStatusCondition(createdCrd.Status.Conditions, brokerv1beta1.DeployedConditionType)
+				g.Expect(deployedCondition.Reason).Should(Equal(brokerv1beta1.DeployedConditionValidationFailedReason))
+
+				g.Expect(meta.IsStatusConditionFalse(createdCrd.Status.Conditions, brokerv1beta1.ValidConditionType)).Should(BeTrue())
+				validationCondition := meta.FindStatusCondition(createdCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
+				g.Expect(validationCondition.Reason).To(Equal(brokerv1beta1.ValidConditionFailedExtraMountReason))
+				g.Expect(validationCondition.Message).To(ContainSubstring("a.properties"))
+
+			}, timeout, interval).Should(Succeed())
+
+			By("update secret map")
+			createdSecret := &corev1.Secret{}
+			secretName := types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}
+			Eventually(func(g Gomega) {
+
+				g.Expect(k8sClient.Get(ctx, secretName, createdSecret)).Should(Succeed())
+				createdSecret.StringData = map[string]string{"a.properties": "journalMinFiles=20"}
+				g.Expect(k8sClient.Update(ctx, createdSecret)).Should(Succeed())
+
+			}, timeout, interval).Should(Succeed())
+
+			By("verifying now valid")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+				g.Expect(meta.IsStatusConditionTrue(createdCrd.Status.Conditions, brokerv1beta1.ValidConditionType)).Should(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("Invalidating again via brokerProperties")
+			Eventually(func(g Gomega) {
+
+				g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+
+				createdCrd.Spec.BrokerProperties = []string{
+					"journalMinFiles=30",
+					"journalMinFiles=40",
+				}
+
+				g.Expect(k8sClient.Update(ctx, createdCrd)).Should(Succeed())
+
+			}, timeout, interval).Should(Succeed())
+
+			By("verifying now invalid with cr.brokerPropertiues dups")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+				g.Expect(meta.IsStatusConditionTrue(createdCrd.Status.Conditions, brokerv1beta1.ValidConditionType)).Should(BeFalse())
+
+				validationCondition := meta.FindStatusCondition(createdCrd.Status.Conditions, brokerv1beta1.ValidConditionType)
+				g.Expect(validationCondition.Reason).To(Equal(brokerv1beta1.ValidConditionFailedDuplicateBrokerPropertiesKey))
+				g.Expect(validationCondition.Message).To(ContainSubstring("journalMinFiles"))
+
+			}, timeout, interval).Should(Succeed())
+
+			By("remove duplicate")
+			Eventually(func(g Gomega) {
+
+				g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+
+				createdCrd.Spec.BrokerProperties = []string{
+					"journalMinFiles=50",
+				}
+
+				g.Expect(k8sClient.Update(ctx, createdCrd)).Should(Succeed())
+
+			}, timeout, interval).Should(Succeed())
+
+			By("verifying now valid")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+				g.Expect(meta.IsStatusConditionTrue(createdCrd.Status.Conditions, brokerv1beta1.ValidConditionType)).Should(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, &crd)).To(Succeed())
+		})
+
 		It("onboarding - jaas-config new user queue rbac", func() {
 
 			ctx := context.Background()
@@ -9244,6 +9490,111 @@ var _ = Describe("artemis controller", func() {
 			Expect(k8sClient.Delete(ctx, &crd)).To(Succeed())
 		})
 
+		It("-bp suffix secret broker-n support", Label("broker-n-bp-secret"), func() {
+
+			ctx := context.Background()
+
+			_, bpSecret1 := DeploySecret(defaultNamespace, func(candidate *corev1.Secret) {
+				candidate.Name = "config-1-bp"
+				candidate.StringData = map[string]string{
+					"journal1.properties":           `journalFileSize=12345`,
+					"broker-0.globalMem.properties": `globalMaxSize=512M`,
+				}
+			})
+
+			_, bpSecret2 := DeploySecret(defaultNamespace, func(candidate *corev1.Secret) {
+				candidate.Name = "config-2-bp"
+				candidate.StringData = map[string]string{
+					"journal2.properties":           `journalMinFiles=3`,
+					"broker-1.globalMem.properties": `globalMaxSize=12M`,
+				}
+			})
+
+			By("Deploying the CRD")
+			_, crd := DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+				candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(2)
+				candidate.Spec.DeploymentPlan.ExtraMounts.Secrets = []string{bpSecret1.Name, bpSecret2.Name}
+			})
+
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+				ssKey := types.NamespacedName{
+					Name:      namer.CrToSS(crd.Name),
+					Namespace: defaultNamespace,
+				}
+
+				By("checking statefulset is ready")
+				currentSS := &appsv1.StatefulSet{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, ssKey, currentSS)).Should(Succeed())
+					g.Expect(currentSS.Status.ReadyReplicas).To(Equal(int32(2)))
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				By("checking pod 0 status that has properties applied")
+				podWithOrdinal0 := namer.CrToSS(crd.Name) + "-0"
+
+				curlUrl := "http://" + podWithOrdinal0 + ":8161/console/jolokia/read/org.apache.activemq.artemis:broker=\"amq-broker\"/Status"
+				curlCmd := []string{"curl", "-s", "-H", "Origin: http://localhost:8161", "-u", "user:password", curlUrl}
+				Eventually(func(g Gomega) {
+					result, err := RunCommandInPod(podWithOrdinal0, crd.Name+"-container", curlCmd)
+					g.Expect(err).To(BeNil())
+					g.Expect(*result).To(ContainSubstring("journal1.properties"))
+					g.Expect(*result).To(ContainSubstring("broker-0.globalMem.properties"))
+					g.Expect(*result).To(ContainSubstring("journal2.properties"))
+					g.Expect(*result).NotTo(ContainSubstring("broker-1.globalMem.properties"))
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				curlUrl = "http://" + podWithOrdinal0 + ":8161/console/jolokia/read/org.apache.activemq.artemis:broker=\"amq-broker\"/GlobalMaxSize"
+				curlCmd = []string{"curl", "-s", "-H", "Origin: http://localhost:8161", "-u", "user:password", curlUrl}
+				Eventually(func(g Gomega) {
+					result, err := RunCommandInPod(podWithOrdinal0, crd.Name+"-container", curlCmd)
+					g.Expect(err).To(BeNil())
+					// 512M = 512 * 1024 * 1024
+					g.Expect(*result).To(ContainSubstring("\"value\":536870912"))
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				By("checking pod 1 status that has properties applied")
+				podWithOrdinal1 := namer.CrToSS(crd.Name) + "-1"
+
+				curlUrl = "http://" + podWithOrdinal1 + ":8161/console/jolokia/read/org.apache.activemq.artemis:broker=\"amq-broker\"/Status"
+				curlCmd = []string{"curl", "-s", "-H", "Origin: http://localhost:8161", "-u", "user:password", curlUrl}
+				Eventually(func(g Gomega) {
+					result, err := RunCommandInPod(podWithOrdinal1, crd.Name+"-container", curlCmd)
+					g.Expect(err).To(BeNil())
+					g.Expect(*result).To(ContainSubstring("journal1.properties"))
+					g.Expect(*result).To(ContainSubstring("broker-1.globalMem.properties"))
+					g.Expect(*result).To(ContainSubstring("journal2.properties"))
+					g.Expect(*result).NotTo(ContainSubstring("broker-0.globalMem.properties"))
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				curlUrl = "http://" + podWithOrdinal1 + ":8161/console/jolokia/read/org.apache.activemq.artemis:broker=\"amq-broker\"/GlobalMaxSize"
+				curlCmd = []string{"curl", "-s", "-H", "Origin: http://localhost:8161", "-u", "user:password", curlUrl}
+				Eventually(func(g Gomega) {
+					result, err := RunCommandInPod(podWithOrdinal1, crd.Name+"-container", curlCmd)
+					g.Expect(err).To(BeNil())
+					// 12M = 12 * 1024 * 1024
+					g.Expect(*result).To(ContainSubstring("\"value\":12582912"))
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+				brokerKey := types.NamespacedName{Name: crd.Name, Namespace: crd.Namespace}
+
+				By("verify status ok")
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, brokerKey, createdCrd)).Should(Succeed())
+
+					condition := meta.FindStatusCondition(createdCrd.Status.Conditions, brokerv1beta1.ConfigAppliedConditionType)
+					g.Expect(condition).NotTo(BeNil())
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+			}
+
+			Expect(k8sClient.Delete(ctx, crd)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, bpSecret1)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, bpSecret2)).To(Succeed())
+		})
+
 		It("extraMount.configMap logging config manually", func() {
 
 			ctx := context.Background()
@@ -9323,5 +9674,184 @@ var _ = Describe("artemis controller", func() {
 			Expect(k8sClient.Delete(ctx, &crd)).To(Succeed())
 		})
 
+	})
+
+	Context("cluster", Label("cluster"), func() {
+		It("secure connections with wildcard DNS name", func() {
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+				crd := generateArtemisSpec(defaultNamespace)
+
+				tlsSecretName := crd.Name + "tls-secret"
+				tlsSecret, err := CreateTlsSecret(tlsSecretName, defaultNamespace, defaultPassword, []string{
+					"*." + crd.Name + "-hdls-svc." + defaultNamespace + ".svc.cluster.local",
+				})
+				Expect(err).To(BeNil())
+				Expect(k8sClient.Create(ctx, tlsSecret)).Should(Succeed())
+
+				crd.Spec.DeploymentPlan.Size = common.Int32ToPtr(2)
+				crd.Spec.Acceptors = []brokerv1beta1.AcceptorType{
+					{
+						Name:       "artemis",
+						Port:       61616,
+						SSLEnabled: true,
+						SSLSecret:  tlsSecretName,
+					},
+				}
+
+				crd.Spec.BrokerProperties = []string{
+					"connectorConfigurations.artemis.params.sslEnabled=true",
+					"connectorConfigurations.artemis.params.trustStorePath=/etc/" + tlsSecretName + "-volume/broker.ks",
+					"connectorConfigurations.artemis.params.trustStorePassword=" + defaultPassword,
+				}
+
+				By("Deploying broker" + crd.Name)
+				Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					jolokia := jolokia.GetJolokia(crd.Name+"-ss-0."+crd.Name+"-hdls-svc.test.svc.cluster.local", "8161", "/console/jolokia", "", "", "http")
+					data, err := jolokia.Read("org.apache.activemq.artemis:broker=\"amq-broker\",component=cluster-connections,name=\"my-cluster\"/Nodes")
+					g.Expect(err).To(BeNil())
+					g.Expect(data.Value).Should(ContainSubstring(crd.Name+"-ss-1"), data.Value)
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				CleanResource(&crd, crd.Name, defaultNamespace)
+				CleanResource(tlsSecret, tlsSecret.Name, defaultNamespace)
+			}
+		})
+
+		It("secure connections with openshift serving certificate", func() {
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" && isOpenshift {
+				crd := generateArtemisSpec(defaultNamespace)
+
+				tlsSecretName := crd.Name + "-ptls"
+				crd.Spec.DeploymentPlan.Size = common.Int32ToPtr(2)
+				crd.Spec.Acceptors = []brokerv1beta1.AcceptorType{
+					{
+						Name:       "artemis",
+						Port:       61616,
+						SSLEnabled: true,
+						SSLSecret:  tlsSecretName,
+					},
+				}
+
+				crd.Spec.BrokerProperties = []string{
+					"connectorConfigurations.artemis.params.sslEnabled=true",
+					"connectorConfigurations.artemis.params.trustStorePath=/etc/" + tlsSecretName + "-volume/tls.crt",
+					"connectorConfigurations.artemis.params.trustStoreType=PEM",
+				}
+
+				crd.Spec.ResourceTemplates = []brokerv1beta1.ResourceTemplate{
+					{
+						Selector: &brokerv1beta1.ResourceSelector{
+							Kind: ptr.To("Service"),
+							Name: ptr.To(crd.Name + "-hdls-svc"),
+						},
+						Annotations: map[string]string{
+							"service.beta.openshift.io/serving-cert-secret-name": tlsSecretName,
+						},
+					},
+				}
+
+				By("Deploying broker" + crd.Name)
+				Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					jolokia := jolokia.GetJolokia(crd.Name+"-ss-0."+crd.Name+"-hdls-svc."+defaultNamespace+".svc.cluster.local", "8161", "/console/jolokia", "", "", "http")
+					data, err := jolokia.Read("org.apache.activemq.artemis:broker=\"amq-broker\",component=cluster-connections,name=\"my-cluster\"/Nodes")
+					g.Expect(err).To(BeNil())
+					g.Expect(data.Value).Should(ContainSubstring(crd.Name+"-ss-1"), data.Value)
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				CleanResource(&crd, crd.Name, defaultNamespace)
+			}
+		})
+
+		It("secure connections with multiple DNS names", func() {
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+				crd := generateArtemisSpec(defaultNamespace)
+
+				tlsSecretName := crd.Name + "tls-secret"
+				tlsSecret, err := CreateTlsSecret(tlsSecretName, defaultNamespace, defaultPassword, []string{
+					crd.Name + "-ss-0." + crd.Name + "-hdls-svc." + defaultNamespace + ".svc.cluster.local",
+					crd.Name + "-ss-1." + crd.Name + "-hdls-svc." + defaultNamespace + ".svc.cluster.local",
+				})
+				Expect(err).To(BeNil())
+				Expect(k8sClient.Create(ctx, tlsSecret)).Should(Succeed())
+
+				crd.Spec.DeploymentPlan.Size = common.Int32ToPtr(2)
+				crd.Spec.Acceptors = []brokerv1beta1.AcceptorType{
+					{
+						Name:       "artemis",
+						Port:       61616,
+						SSLEnabled: true,
+						SSLSecret:  tlsSecretName,
+					},
+				}
+
+				crd.Spec.BrokerProperties = []string{
+					"connectorConfigurations.artemis.params.sslEnabled=true",
+					"connectorConfigurations.artemis.params.trustStorePath=/etc/" + tlsSecretName + "-volume/broker.ks",
+					"connectorConfigurations.artemis.params.trustStorePassword=" + defaultPassword,
+				}
+
+				By("Deploying broker" + crd.Name)
+				Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					jolokia := jolokia.GetJolokia(crd.Name+"-ss-0."+crd.Name+"-hdls-svc."+defaultNamespace+".svc.cluster.local", "8161", "/console/jolokia", "", "", "http")
+					data, err := jolokia.Read("org.apache.activemq.artemis:broker=\"amq-broker\",component=cluster-connections,name=\"my-cluster\"/Nodes")
+					g.Expect(err).To(BeNil())
+					g.Expect(data.Value).Should(ContainSubstring(crd.Name+"-ss-1"), data.Value)
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				CleanResource(&crd, crd.Name, defaultNamespace)
+				CleanResource(tlsSecret, tlsSecret.Name, defaultNamespace)
+			}
+		})
+
+		It("secure connections with verify host disabled", func() {
+			if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+				crd := generateArtemisSpec(defaultNamespace)
+
+				tlsSecretName := crd.Name + "tls-secret"
+				tlsSecret, err := CreateTlsSecret(tlsSecretName, defaultNamespace, defaultPassword, []string{})
+				Expect(err).To(BeNil())
+				Expect(k8sClient.Create(ctx, tlsSecret)).Should(Succeed())
+
+				crd.Spec.DeploymentPlan.Size = common.Int32ToPtr(2)
+				crd.Spec.Acceptors = []brokerv1beta1.AcceptorType{
+					{
+						Name:       "artemis",
+						Port:       61616,
+						SSLEnabled: true,
+						SSLSecret:  tlsSecretName,
+					},
+				}
+
+				crd.Spec.BrokerProperties = []string{
+					"connectorConfigurations.artemis.params.sslEnabled=true",
+					"connectorConfigurations.artemis.params.trustStorePath=/etc/" + tlsSecretName + "-volume/broker.ks",
+					"connectorConfigurations.artemis.params.trustStorePassword=" + defaultPassword,
+					"connectorConfigurations.artemis.params.verifyHost=false",
+				}
+
+				By("Deploying broker" + crd.Name)
+				Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					jolokia := jolokia.GetJolokia(crd.Name+"-ss-0."+crd.Name+"-hdls-svc."+defaultNamespace+".svc.cluster.local", "8161", "/console/jolokia", "", "", "http")
+					data, err := jolokia.Read("org.apache.activemq.artemis:broker=\"amq-broker\",component=cluster-connections,name=\"my-cluster\"/Nodes")
+					g.Expect(err).To(BeNil())
+					g.Expect(data.Value).Should(ContainSubstring(crd.Name+"-ss-1"), data.Value)
+
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				CleanResource(&crd, crd.Name, defaultNamespace)
+				CleanResource(tlsSecret, tlsSecret.Name, defaultNamespace)
+			}
+		})
 	})
 })

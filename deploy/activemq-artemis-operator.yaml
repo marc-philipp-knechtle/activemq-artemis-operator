@@ -400,13 +400,13 @@ spec:
                       description: Whether or not to expose this acceptor
                       type: boolean
                     exposeMode:
-                      description: Mode to expose the acceptor. Currently the supported modes are `route` and `ingress`. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the acceptor.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the acceptor with TLS passthrough.\n"
+                      description: Mode to expose the acceptor. Currently the supported modes are `route` and `ingress`. It is ignored when the field `Expose` is false. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the acceptor.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the acceptor with TLS passthrough.\n"
                       enum:
                       - ingress
                       - route
                       type: string
                     ingressHost:
-                      description: 'Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)'
+                      description: 'Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). It is required for the acceptors exposed with the ingress mode when the ingress domain is not specified.'
                       type: string
                     keyStoreProvider:
                       description: Provider used for the keystore; "SUN", "SunJCE", etc. Default is null
@@ -445,6 +445,9 @@ spec:
                     suppressInternalManagementObjects:
                       description: If prevents advisory addresses/queues to be registered to management service, default false
                       type: boolean
+                    trustSecret:
+                      description: The name of the truststore secret.
+                      type: string
                     trustStoreProvider:
                       description: Provider used for the truststore; "SUN", "SunJCE", etc. Default in broker is null
                       type: string
@@ -719,7 +722,7 @@ spec:
                       description: Whether or not to expose this connector
                       type: boolean
                     exposeMode:
-                      description: Mode to expose the connector. Currently the supported modes are `route` and `ingress`. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the connector.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the connector with TLS passthrough.\n"
+                      description: Mode to expose the connector. Currently the supported modes are `route` and `ingress`. It is ignored when the field `Expose` is false. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the connector.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the connector with TLS passthrough.\n"
                       enum:
                       - ingress
                       - route
@@ -728,7 +731,7 @@ spec:
                       description: Hostname or IP to connect to
                       type: string
                     ingressHost:
-                      description: 'Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)'
+                      description: 'Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). It is required for the connectors exposed with the ingress mode when the ingress domain is not specified.'
                       type: string
                     keyStoreProvider:
                       description: Provider used for the keystore; "SUN", "SunJCE", etc. Default is null
@@ -754,6 +757,9 @@ spec:
                       type: string
                     sslSecret:
                       description: Name of the secret to use for ssl information
+                      type: string
+                    trustSecret:
+                      description: The name of the truststore secret.
                       type: string
                     trustStoreProvider:
                       description: Provider used for the truststore; "SUN", "SunJCE", etc. Default in broker is null
@@ -783,13 +789,13 @@ spec:
                     description: Whether or not to expose this port
                     type: boolean
                   exposeMode:
-                    description: Mode to expose the console. Currently the supported modes are `route` and `ingress`. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the console.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the console with TLS passthrough.\n"
+                    description: Mode to expose the console. Currently the supported modes are `route` and `ingress`. It is ignored when the field `Expose` is false. Default is `route` on OpenShift and `ingress` on Kubernetes. \n\n* `route` mode uses OpenShift Routes to expose the console.\n* `ingress` mode uses Kubernetes Nginx Ingress to expose the console with TLS passthrough.\n"
                     enum:
                     - ingress
                     - route
                     type: string
                   ingressHost:
-                    description: 'Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE)-$(CR_NAMESPACE).$(INGRESS_DOMAIN)'
+                    description: 'Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). It is required for the console exposed with the ingress mode when the ingress domain is not specified.'
                     type: string
                   name:
                     description: The name of the console. Default is wconsj.
@@ -799,6 +805,9 @@ spec:
                     type: boolean
                   sslSecret:
                     description: Name of the secret to use for ssl information
+                    type: string
+                  trustSecret:
+                    description: The name of the truststore secret.
                     type: string
                   useClientAuth:
                     description: If the embedded server requires client authentication
@@ -3247,7 +3256,7 @@ spec:
                   type: object
                 type: array
               ingressDomain:
-                description: The ingress domain to expose the application. By default, on Kubernetes it is apps.artemiscloud.io and on OpenShift it is the Ingress Controller domain.
+                description: The default ingress domain. It is required when any acceptor, connector or console uses the ingress mode and does not specify an IngressHost.
                 type: string
               resourceTemplates:
                 description: Specifies the template for various resources that the operator controls
@@ -6298,6 +6307,10 @@ spec:
           value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:3bbfb6177e4839087f615a01ee54f9e06a95acaddbb083e11851b6af9315dbf0
         - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2320
           value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:52f337cd5d7d5d199eebf4fc722f8c5279f652506f009efbc0f8f6de88e18718
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Init_2330
+          value: quay.io/artemiscloud/activemq-artemis-broker-init@sha256:93168fd8cd4fb32f041795afb8fb0e21cf81081d6cc463a44356e153dc1ad032
+        - name: RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_2330
+          value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes@sha256:b293c1269166cc6181f68b8d803fdfcf20fdbd5df2787ed0453724b22e298fb2
         - name: OPERATOR_NAME
           valueFrom:
             fieldRef:
@@ -6310,7 +6323,7 @@ spec:
           value: ''
         - name: ENABLE_WEBHOOKS
           value: "false"
-        image: quay.io/artemiscloud/activemq-artemis-operator:1.1.0
+        image: quay.io/artemiscloud/activemq-artemis-operator:1.2.1
         livenessProbe:
           httpGet:
             path: /healthz

@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,6 +65,7 @@ import (
 
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/ingresses"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
+	tm "github.com/cert-manager/trust-manager/pkg/apis/trust/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -90,6 +92,9 @@ const (
 	namespace2              = "namespace2"
 	namespace3              = "namespace3"
 	specShortNameLimit      = 25
+
+	// Default ingress domain for tests
+	defaultTestIngressDomain = "tests.artemiscloud.io"
 )
 
 var (
@@ -118,7 +123,9 @@ var (
 	brokerReconciler   *ActiveMQArtemisReconciler
 	securityReconciler *ActiveMQArtemisSecurityReconciler
 
-	oprRes = []string{
+	depName string
+	oprName string
+	oprRes  = []string{
 		"../deploy/service_account.yaml",
 		"../deploy/role.yaml",
 		"../deploy/role_binding.yaml",
@@ -201,12 +208,14 @@ func setUpNamespace() {
 	Expect(err == nil || errors.IsConflict(err))
 
 	if isOpenshift {
-		testNamespaceKey := types.NamespacedName{Name: defaultNamespace}
-		Expect(k8sClient.Get(ctx, testNamespaceKey, &testNamespace)).Should(Succeed())
-		uidRange := testNamespace.Annotations["openshift.io/sa.scc.uid-range"]
-		uidRangeTokens := strings.Split(uidRange, "/")
-		defaultUid, err = strconv.ParseInt(uidRangeTokens[0], 10, 64)
-		Expect(err).Should(Succeed())
+		Eventually(func(g Gomega) {
+			testNamespaceKey := types.NamespacedName{Name: defaultNamespace}
+			g.Expect(k8sClient.Get(ctx, testNamespaceKey, &testNamespace)).Should(Succeed())
+			uidRange := testNamespace.Annotations["openshift.io/sa.scc.uid-range"]
+			uidRangeTokens := strings.Split(uidRange, "/")
+			defaultUid, err = strconv.ParseInt(uidRangeTokens[0], 10, 64)
+			g.Expect(err).Should(Succeed())
+		}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 	}
 }
 
@@ -281,7 +290,7 @@ func setUpTestProxy() {
 					Containers: []corev1.Container{
 						{
 							Name:    "ningx",
-							Image:   "ubuntu/squid:edge",
+							Image:   "docker.io/ubuntu/squid:edge",
 							Command: []string{"sh", "-c", testProxyScript},
 							Ports: []corev1.ContainerPort{
 								{
@@ -563,7 +572,7 @@ func uninstallOperator(deleteCrds bool, namespace string) error {
 
 func waitForOperator(namespace string) error {
 	podList := &corev1.PodList{}
-	labelSelector, err := labels.Parse("name=activemq-artemis-operator")
+	labelSelector, err := labels.Parse("name=" + oprName)
 	Expect(err).To(BeNil())
 	opts := &client.ListOptions{
 		Namespace:     namespace,
@@ -632,6 +641,8 @@ func installYamlResource(resPath string, envMap map[string]string, namespace str
 
 	if gkv.Kind == "Deployment" {
 		oprObj := cobj.(*appsv1.Deployment)
+		depName = oprObj.Name
+		oprName = oprObj.Spec.Template.Labels["name"]
 		if oprImg := os.Getenv("IMG"); oprImg != "" {
 			ctrl.Log.Info("Using custom operator image", "url", oprImg)
 			oprObj.Spec.Template.Spec.Containers[0].Image = oprImg
@@ -670,6 +681,12 @@ func setUpK8sClient() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = routev1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = cmv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = tm.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = brokerv2alpha5.AddToScheme(scheme.Scheme)

@@ -3,9 +3,15 @@ kind: ActiveMQArtemis
 metadata:
   name: artemis-broker
 spec:
-  # version: 2.32.0
+  version: 2.32.0
   deploymentPlan:
-    size: 2
-    persistenceEnabled: true
+    size: 3
+    # PersistenceEnabled description:
+    # (see description in operator.md)
+    # = create brokers with persistent Storage, each broker requires 2GB
+    # persistenceEnabled requires persistent volumes in the cluster
+    # Error with persistenceEnabled true: 0/3 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling..
+    # persistenceEnabled: true
+    # <!-- -->
     # messageMigration requires 2+ brokers
     messageMigration: true

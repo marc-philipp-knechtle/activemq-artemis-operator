@@ -28,6 +28,7 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -40,6 +41,7 @@ import (
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/secrets"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -52,6 +54,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,6 +64,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/remotecommand"
 )
 
@@ -616,34 +620,45 @@ func DeployCustomAddress(targetNamespace string, customFunc func(candidate *brok
 }
 
 func GetOperatorLog(ns string) (*string, error) {
-	cfg, err := config.GetConfig()
-	Expect(err).To(BeNil())
-	labelSelector, err := labels.Parse("control-plane=controller-manager,name=" + oprName)
-	Expect(err).To(BeNil())
-	clientset, err := kubernetes.NewForConfig(cfg)
-	Expect(err).To(BeNil())
-	listOpts := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+	var cfg *rest.Config
+	var err error
+	if cfg, err = config.GetConfig(); err == nil {
+
+		var labelSelector labels.Selector
+		if labelSelector, err = labels.Parse("control-plane=controller-manager,name=" + oprName); err == nil {
+
+			var clientset *kubernetes.Clientset
+			if clientset, err = kubernetes.NewForConfig(cfg); err == nil {
+
+				listOpts := metav1.ListOptions{
+					LabelSelector: labelSelector.String(),
+				}
+				var podList *corev1.PodList
+				if podList, err = clientset.CoreV1().Pods(ns).List(ctx, listOpts); err == nil {
+
+					if len(podList.Items) != 1 {
+						err = fmt.Errorf("expect a single pod")
+					} else {
+
+						operatorPod := podList.Items[0]
+						podLogOpts := corev1.PodLogOptions{}
+						req := clientset.CoreV1().Pods(ns).GetLogs(operatorPod.Name, &podLogOpts)
+
+						var podLogs io.ReadCloser
+						if podLogs, err = req.Stream(context.Background()); err == nil {
+							defer podLogs.Close()
+							buf := new(bytes.Buffer)
+							if _, err = io.Copy(buf, podLogs); err == nil {
+								str := buf.String()
+								return &str, nil
+							}
+						}
+					}
+				}
+			}
+		}
 	}
-	podList, err := clientset.CoreV1().Pods(ns).List(ctx, listOpts)
-	Expect(err).To(BeNil())
-	Expect(len(podList.Items)).To(Equal(1))
-	operatorPod := podList.Items[0]
-
-	podLogOpts := corev1.PodLogOptions{}
-	req := clientset.CoreV1().Pods(ns).GetLogs(operatorPod.Name, &podLogOpts)
-	podLogs, err := req.Stream(context.Background())
-	Expect(err).To(BeNil())
-	defer podLogs.Close()
-
-	Expect(err).To(BeNil())
-
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, podLogs)
-	Expect(err).To(BeNil())
-	str := buf.String()
-
-	return &str, nil
+	return nil, err
 }
 
 func NewPriveKey() (*rsa.PrivateKey, error) {
@@ -1058,4 +1073,38 @@ func UninstallClusteredIssuer(issuerName string) {
 	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
 	CleanResource(currentIssuer, issuerName, defaultNamespace)
+}
+
+type NillCluster struct {
+}
+
+func (m *NillCluster) GetHTTPClient() *http.Client {
+	return nil
+}
+func (m *NillCluster) GetConfig() *rest.Config {
+	return nil
+}
+func (m *NillCluster) GetCache() cache.Cache {
+	return nil
+}
+func (m *NillCluster) GetScheme() *runtime.Scheme {
+	return nil
+}
+func (m *NillCluster) GetClient() client.Client {
+	return nil
+}
+func (m *NillCluster) GetFieldIndexer() client.FieldIndexer {
+	return nil
+}
+func (m *NillCluster) GetEventRecorderFor(name string) record.EventRecorder {
+	return nil
+}
+func (m *NillCluster) GetRESTMapper() meta.RESTMapper {
+	return nil
+}
+func (m *NillCluster) GetAPIReader() client.Reader {
+	return nil
+}
+func (m *NillCluster) Start(ctx context.Context) error {
+	return nil
 }

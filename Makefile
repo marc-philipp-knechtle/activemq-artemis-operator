@@ -59,7 +59,7 @@ IMAGE_TAG_BASE ?= quay.io/artemiscloud/activemq-artemis-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -123,13 +123,13 @@ ifeq ($(ENABLE_WEBHOOKS),true)
 ## v2alpha3, v2alpha4 and v2alpha3 requires allowDangerousTypes=true because they use float32 type
 	cd config/manager && $(KUSTOMIZE) edit add resource webhook_secret.yaml 
 	$(CONTROLLER_GEN) rbac:roleName=$(OPERATOR_CLUSTER_ROLE_NAME) crd:allowDangerousTypes=true webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	find config -type f -exec sed -i.bak -e '/creationTimestamp/d' {} \; -exec rm {}.bak \;
+	find config -type f -exec sed -i.bak -e '/creationTimestamp:/d' {} \; -exec rm {}.bak \;
 else
 ## Generate ClusterRole and CustomResourceDefinition objects.
 ## v2alpha3, v2alpha4 and v2alpha3 requires allowDangerousTypes=true because they use float32 type
 	cd config/manager && $(KUSTOMIZE) edit remove resource webhook_secret.yaml 
 	$(CONTROLLER_GEN) rbac:roleName=$(OPERATOR_CLUSTER_ROLE_NAME) crd:allowDangerousTypes=true paths="./..." output:crd:artifacts:config=config/crd/bases
-	find config -type f -exec sed -i.bak -e '/creationTimestamp/d' {} \; -exec rm {}.bak \;
+	find config -type f -exec sed -i.bak -e '/creationTimestamp:/d' {} \; -exec rm {}.bak \;
 endif
 
 .PHONY: generate
@@ -160,7 +160,7 @@ test-mk-do-fast test-mk-do-fast-v: TEST_ARGS += -test.timeout=30m -ginkgo.label-
 test-mk-do-fast test-mk-do-fast-v: TEST_VARS = DEPLOY_OPERATOR=true ENABLE_WEBHOOKS=false USE_EXISTING_CLUSTER=true
 
 test-v test-mk-v test-mk-do-v test-mk-do-fast-v: TEST_ARGS += -v
-test-v test-mk test-mk-v test-mk-do test-mk-do-v test-mk-do-fast test-mk-do-fast-v: TEST_ARGS += -ginkgo.poll-progress-after=30s -ginkgo.fail-fast -coverprofile cover-mk.out
+test-v test-mk test-mk-v test-mk-do test-mk-do-v test-mk-do-fast test-mk-do-fast-v: TEST_ARGS += -ginkgo.poll-progress-after=150s -ginkgo.fail-fast -coverprofile cover-mk.out
 
 test test-v test-mk test-mk-v test-mk-do test-mk-do-v test-mk-do-fast test-mk-do-fast-v: manifests generate fmt vet envtest 
 	$(TEST_VARS) go test ./... -p 1 $(TEST_ARGS) $(TEST_EXTRA_ARGS)
@@ -281,7 +281,7 @@ bundle: manifests operator-sdk kustomize ## Generate bundle manifests and metada
 	$(OPERATOR_SDK) generate kustomize manifests -q --package $(BUNDLE_PACKAGE)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle --package $(BUNDLE_PACKAGE) $(BUNDLE_GEN_FLAGS)
-	sed -i.bak '/creationTimestamp/d' ./bundle/manifests/*.yaml && rm ./bundle/manifests/*.bak
+	sed -i.bak '/creationTimestamp:/d' ./bundle/manifests/*.yaml && rm ./bundle/manifests/*.bak
 	sed -i.bak '/createdAt/d' ./bundle/manifests/*.yaml && rm ./bundle/manifests/*.bak
 	sed 's/annotations://' config/metadata/$(BUNDLE_PACKAGE).annotations.yaml >> bundle/metadata/annotations.yaml
 	sed -e 's/annotations://' -e 's/  /LABEL /g' -e 's/: /=/g'  config/metadata/$(BUNDLE_PACKAGE).annotations.yaml >> bundle.Dockerfile

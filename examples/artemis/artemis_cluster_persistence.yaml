@@ -6,11 +6,12 @@ spec:
   version: 2.32.0
   deploymentPlan:
     size: 3
-    # PersistenceEnabled description:
     # (see description in operator.md)
     # = create brokers with persistent Storage, each broker requires 2GB
     # persistenceEnabled requires persistent volumes in the cluster
-    # Error with persistenceEnabled true: 0/3 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling..
+    #           Error with persistenceEnabled true: 0/3 nodes are available: pod has unbound immediate
+    #           PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+    #           -> solved with podSecurityContext.fsGroup
     persistenceEnabled: true
     # <!-- -->
     # messageMigration requires 2+ brokers
@@ -26,4 +27,18 @@ spec:
     # -> https://github.com/artemiscloud/activemq-artemis-operator/issues/187 This provided the fix
     # Further discussion here: https://github.com/artemiscloud/activemq-artemis-operator/issues/52
     podSecurityContext:
-        fsGroup: 0
+      fsGroup: 0
+  acceptors:
+    - name: anevis-acceptor-all
+      protocols: all
+      sslEnabled: false
+      needClientAuth: false
+      wantClientAuth: false
+      verifyHost: false
+      expose: false
+  console:
+    expose: true
+    name: webconsole
+    sslEnabled: false
+  adminUser: admin
+  adminPassword: admin

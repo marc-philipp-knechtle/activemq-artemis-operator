@@ -11,7 +11,19 @@ spec:
     # = create brokers with persistent Storage, each broker requires 2GB
     # persistenceEnabled requires persistent volumes in the cluster
     # Error with persistenceEnabled true: 0/3 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling..
-    # persistenceEnabled: true
+    persistenceEnabled: true
     # <!-- -->
     # messageMigration requires 2+ brokers
     messageMigration: true
+    # This enables to use the persistenceEnabled attribute above
+    # PodSecurityContext defines the security settings for a pod and all of it's containers
+    # fsGroup   special supplemental group where all the containers in a pod belong to. If a container writes a file,
+    #           if a container writes a file, the file is created with the GID from fsGroup
+    #           Any files created on a mounted volume are owned by the group specified in fsGroup
+    #           -> This helps where multiple processes or containers share access to a file/volume
+    #           !fsGroup applies to all containers within a pod!
+    #           Setting fsGroup: 0 implies that all files created will be owned by the root group
+    # -> https://github.com/artemiscloud/activemq-artemis-operator/issues/187 This provided the fix
+    # Further discussion here: https://github.com/artemiscloud/activemq-artemis-operator/issues/52
+    podSecurityContext:
+        fsGroup: 0

@@ -26,3 +26,15 @@ Install delve in the `builder` container, i.e. `RUN go install github.com/go-del
 Disable build optimization, i.e. `go build -gcflags="all=-N -l"`
 Copy delve to the `base-env` container, i.e. `COPY --from=builder /go/bin/dlv /bin`
 Execute operator using delve, i.e. `/bin/dlv exec --listen=0.0.0.0:40000 --headless=true --api-version=2 --accept-multiclient ${OPERATOR} $@`
+
+# Anevis Activemq-Operator questions
+## Updating the cluster
+### General Update procedure
+See operator/eks-work.md
+### Running updates while messages are in the cluster?
+
+## Cluster Load Test
+
+## Clustering Questions
+### Changes in the broker.xml when using deploymentPlan.size > 1
+

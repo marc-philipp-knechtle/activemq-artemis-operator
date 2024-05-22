@@ -38,3 +38,7 @@ See operator/eks-work.md
 ## Clustering Questions
 ### Changes in the broker.xml when using deploymentPlan.size > 1
 
+## Stopping some pods 
+### What happens with the messages from a single pod when the pod is stopped. Are they redistributed? 
+
+### How difficult is it to merge the EBS storage from on pod with the storage of another pod.

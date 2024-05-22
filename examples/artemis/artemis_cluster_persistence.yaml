@@ -43,6 +43,7 @@ spec:
       # I don't know the optimal value for ingressHost yet!
       # It is required for acceptors exposed with ingress
       ingressHost: asdf.asdf
+      name: anevis-acceptor-all
   console:
     expose: true
     name: webconsole

@@ -35,10 +35,19 @@ spec:
       needClientAuth: false
       wantClientAuth: false
       verifyHost: false
-      expose: false
+      expose: true
+      # mode to expose the acceptor. supported values are route and ingress
+      # route = exposing with openshift routes
+      # ingress = k8s nginx ingress with TLS passthrough
+      exposeMode: ingress
+      # I don't know the optimal value for ingressHost yet!
+      # It is required for acceptors exposed with ingress
+      ingressHost: asdf.asdf
   console:
     expose: true
     name: webconsole
     sslEnabled: false
+    exposeMode: ingress
+    ingressHost: asdf.asdf
   adminUser: admin
   adminPassword: admin

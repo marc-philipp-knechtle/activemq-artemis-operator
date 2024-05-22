@@ -28,10 +28,15 @@ spec:
       needClientAuth: false
       wantClientAuth: false
       verifyHost: false
+      exposeMode: ingress
+      ingressHost: asdf.asdf
       expose: True
   console:
-    expose: true
-    name: webconsole
-    sslEnabled: False
+      expose: true
+      name: webconsole
+      # exposeMode and ingressHost are required for exposing the console!
+      exposeMode: ingress
+      ingressHost: asdf.asdf
+      sslEnabled: false
   adminUser: admin
   adminPassword: admin

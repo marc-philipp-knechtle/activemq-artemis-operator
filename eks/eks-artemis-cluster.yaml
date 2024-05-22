@@ -54,8 +54,8 @@ managedNodeGroups:
   # instanceType: m5.large
   # t2.micro is sufficient for amazonmq -> testing for artemis...
   # instanceType: t2.micro
-  instanceType: t3.micro
-  # All worker nodes are launched into private subnets ?
+  # instanceType: t3.micro # -> This led to this error: Warning  Unsupported  2m40s (x22 over 67m)  vpc-resource-controller  The instance type t3.micro is not supported for trunk interface (Security Group for Pods)
+  instanceType: m5.large
   # Originally this was set to true
   # Reference found with this video: https://www.youtube.com/watch?v=a4qdvu5cVIU
   # And via querying in bing chat.

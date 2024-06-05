@@ -51,11 +51,32 @@ managedNodeGroups:
   desiredCapacity: 3
   minSize: 3
   maxSize: 6
-  # instanceType: m5.large
-  # t2.micro is sufficient for amazonmq -> testing for artemis...
+  ### Overview of the instances with their respective assumed costs
+  ### T3 Instances (Burstable Performance)
+  # | Instance Type | vCPUs | Memory (GB) | On-Demand Price (per hour, USD) |
+  # |---------------|-------|-------------|---------------------------------|
+  # | t3.nano       | 2     | 0.5         | $0.0052                         |
+  # | t3.micro      | 2     | 1           | $0.0104                         |
+  # | t3.small      | 2     | 2           | $0.0208                         |
+  # | t3.medium     | 2     | 4           | $0.0416                         |
+  # | t3.large      | 2     | 8           | $0.0832                         |
+  # | t3.xlarge     | 4     | 16          | $0.1664                         |
+  # | t3.2xlarge    | 8     | 32          | $0.3328                         |
+
+  ### M5 Instances (Balance of Compute, Memory, Networking)
+  # | Instance Type | vCPUs | Memory (GB) | On-Demand Price (per hour, USD) |
+  # |---------------|-------|-------------|---------------------------------|
+  # | m5.large      | 2     | 8           | $0.096                          |
+  # | m5.xlarge     | 4     | 16          | $0.192                          |
+  # | m5.2xlarge    | 8     | 32          | $0.384                          |
+  # | m5.4xlarge    | 16    | 64          | $0.768                          |
+  # | m5.12xlarge   | 48    | 192         | $2.304                          |
+  # | m5.24xlarge   | 96    | 384         | $4.608                          |
+  # | m5.metal      | 96    | 384         | $4.608                          |
+  # instanceType: m5.large # This was the default for the eksworkshop, it also works for the artemis operator
   # instanceType: t2.micro
   # instanceType: t3.micro # -> This led to this error: Warning  Unsupported  2m40s (x22 over 67m)  vpc-resource-controller  The instance type t3.micro is not supported for trunk interface (Security Group for Pods)
-  instanceType: m5.large
+  instanceType: t3.nano
   # Originally this was set to true
   # Reference found with this video: https://www.youtube.com/watch?v=a4qdvu5cVIU
   # And via querying in bing chat.

@@ -40,6 +40,8 @@ Currently, the cluster has no problem processing several thousand messages. (3k)
 ## Clustering Questions
 ### Changes in the broker.xml when using deploymentPlan.size > 1
 
+### How does the broker.xml in the pods reflect the Custom Resources?
+
 ## Stopping some pods 
 ### What happens with the messages from a single pod when the pod is stopped. Are they redistributed? 
 See [this guide](https://developers.redhat.com/articles/2023/12/05/how-use-message-migration-amq-broker-operator#).

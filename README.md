@@ -34,11 +34,26 @@ See operator/eks-work.md
 ### Running updates while messages are in the cluster?
 
 ## Cluster Load Test
+Test the cluster under sustained load (evtl. with a Test Pc). 
+Currently, the cluster has no problem processing several thousand messages. (3k)
 
 ## Clustering Questions
 ### Changes in the broker.xml when using deploymentPlan.size > 1
 
 ## Stopping some pods 
 ### What happens with the messages from a single pod when the pod is stopped. Are they redistributed? 
+See [this guide](https://developers.redhat.com/articles/2023/12/05/how-use-message-migration-amq-broker-operator#).
+It covers this exact issue. Scaling down the deployment. 
+
+Verified with:
+```shell
+kubectl exec artemis-address-queue-ss-0 -n myproject -- /bin/bash /home/jboss/amq-broker/bin/artemis queue stat --user admin --password admin --url tcp://artemis-address-queue-ss-0:61616
+```
+* I don't know why this works, even with the wrong credentials. 
+* It was also possible after some time to access the eks webconsole (after scaling and redeploying)
+
+THIS WORKS! 
+I scaled it to 0 (with the help of the artemis_cluster_persistence.yaml file). After scaling back again, 
+the messages still persisted. 
 
 ### How difficult is it to merge the EBS storage from on pod with the storage of another pod.

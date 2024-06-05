@@ -76,7 +76,8 @@ managedNodeGroups:
   # instanceType: m5.large # This was the default for the eksworkshop, it also works for the artemis operator
   # instanceType: t2.micro
   # instanceType: t3.micro # -> This led to this error: Warning  Unsupported  2m40s (x22 over 67m)  vpc-resource-controller  The instance type t3.micro is not supported for trunk interface (Security Group for Pods)
-  instanceType: t3.nano
+  # instanceType: t3.nano # -> kubectl get deployment -A -> coredns was not available as well as aws-load-balancer-controller after installation
+  instanceType: t3.small
   # Originally this was set to true
   # Reference found with this video: https://www.youtube.com/watch?v=a4qdvu5cVIU
   # And via querying in bing chat.

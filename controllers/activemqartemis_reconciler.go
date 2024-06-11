@@ -1426,11 +1426,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessResources(customResource
 		}
 	}
 
-	var currenCount int
-	for index := range reconciler.deployed {
-		currenCount += len(reconciler.deployed[index])
-	}
-	reqLogger.V(1).Info("Processing resources", "num requested", len(reconciler.requestedResources), "num current", currenCount)
+	reqLogger.V(1).Info("Processing resources", "num requested", countOfRequested(reconciler), "num current", countOfDeployed(reconciler))
 
 	requested := compare.NewMapBuilder().Add(common.ToResourceList(reconciler.requestedResources)...).ResourceMap()
 	comparator := compare.NewMapComparator()
@@ -1505,6 +1501,20 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessResources(customResource
 		// using %q(uote) to keep errors separate
 		return fmt.Errorf("%q", compositeError)
 	}
+}
+
+func countOfRequested(reconciler *ActiveMQArtemisReconcilerImpl) (total int) {
+	for _, v := range reconciler.requestedResources {
+		total += len(v)
+	}
+	return total
+}
+
+func countOfDeployed(reconciler *ActiveMQArtemisReconcilerImpl) (total int) {
+	for _, v := range reconciler.deployed {
+		total += len(v)
+	}
+	return total
 }
 
 // resourceTemplate means we can modify labels and annotatins so we need to
@@ -3143,7 +3153,7 @@ func checkProjectionStatus(cr *brokerv1beta1.ActiveMQArtemis, client rtclient.Cl
 
 		if len(missingKeys) > 0 {
 			if strings.HasSuffix(secretProjection.Name, jaasConfigSuffix) {
-				err = errors.Errorf("out of sync on pod %s-%s, property files are not visible on the broker: %v. Reloadable JAAS LoginModule property files are only visible after the first login attempt that references them. If the property files are for by a third party LoginModule or not reloadable, prefix the property file names with an underscore to exclude them from this condition",
+				err = errors.Errorf("out of sync on pod %s-%s, property files are not visible on the broker: %v. Reloadable JAAS LoginModule property files are only visible after the first login attempt that references them. If the property files are for a third party LoginModule or not reloadable, prefix the property file names with an underscore to exclude them from this condition",
 					namer.CrToSS(cr.Name), jk.Ordinal, missingKeys)
 			} else {
 				err = errors.Errorf("out of sync on pod %s-%s, configuration property files are not visible on the broker: %v. A delay can occur before a volume mount projection is refreshed.",

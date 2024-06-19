@@ -5,14 +5,23 @@ metadata:
 spec:
   # version: 2.32.0 # uncomment the version, in the hope that the broker choses the most
   resourceTemplates:
+      # see https://aws.amazon.com/blogs/containers/exposing-kubernetes-applications-part-1-service-and-ingress-resources/
+      # see https://aws.amazon.com/blogs/containers/exposing-kubernetes-applications-part-2-aws-load-balancer-controller/
+      # https://aws.amazon.com/it/blogs/containers/setting-up-end-to-end-tls-encryption-on-amazon-eks-with-the-new-aws-load-balancer-controller/
       - selector:
           kind: "Ingress"
         annotations:
-            # todo make this name dependent on the name of this ingress
             alb.ingress.kubernetes.io/load-balancer-name: artemis-webconsole-lb-$(BROKER_ORDINAL)
             alb.ingress.kubernetes.io/target-type: ip
             alb.ingress.kubernetes.io/scheme: internet-facing
-            # alb.ingress.kubernetes.io/healthcheck-path: /healthz
+            alb.ingress.kubernetes.io/healthcheck-path: /healthz
+      # see https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
+      - selector:
+          kind: "Service"
+        annotations:
+            service.beta.kubernetes.io/aws-load-balancer-type: external
+            service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+            service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
   deploymentPlan:
     size: 3
     # (see description in operator.md)
@@ -51,7 +60,7 @@ spec:
       exposeMode: ingress
       # I don't know the optimal value for ingressHost yet!
       # It is required for acceptors exposed with ingress
-      ingressHost: asdf.asdf
+      ingressHost: $(INGRESS_DOMAIN)
       name: anevis-acceptor-all
   console:
     expose: true

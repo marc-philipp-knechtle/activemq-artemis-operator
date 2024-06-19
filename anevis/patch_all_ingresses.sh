@@ -2,7 +2,7 @@
 
 NAMESPACE="activemq-artemis-operator"
 
-PATCH_FILE="ing-patch.yml"
+PATCH_FILE="anevis/ing-patch.yml"
 
 INGRESSES=$(kubectl get ingress -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}')
 

@@ -3,7 +3,16 @@ kind: ActiveMQArtemis
 metadata:
   name: artemis-broker
 spec:
-  version: 2.32.0
+  # version: 2.32.0 # uncomment the version, in the hope that the broker choses the most
+  resourceTemplates:
+      - selector:
+          kind: "Ingress"
+        annotations:
+            # todo make this name dependent on the name of this ingress
+            alb.ingress.kubernetes.io/load-balancer-name: artemis-webconsole-lb-$(BROKER_ORDINAL)
+            alb.ingress.kubernetes.io/target-type: ip
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            # alb.ingress.kubernetes.io/healthcheck-path: /healthz
   deploymentPlan:
     size: 3
     # (see description in operator.md)
@@ -49,6 +58,7 @@ spec:
     name: webconsole
     sslEnabled: false
     exposeMode: ingress
-    ingressHost: asdf.asdf
+    # this translates to no specific requirement on the ingress domain
+    ingressHost: $(INGRESS_DOMAIN)
   adminUser: artemis
   adminPassword: artemis

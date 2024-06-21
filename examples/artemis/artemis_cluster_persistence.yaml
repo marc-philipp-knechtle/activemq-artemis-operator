@@ -3,24 +3,47 @@ kind: ActiveMQArtemis
 metadata:
   name: artemis-broker
 spec:
-  # version: 2.32.0 # uncomment the version, in the hope that the broker choses the most
+  # version: 2.32.0 # uncomment the version, in the hope that the broker chooses the most recent one!
   resourceTemplates:
+      # The new AWS Load Balancer manages AWS Elastic Load Balancers for a Kubernetes cluster.
+      # The controller provisions an AWS Application Load Balancer (ALB) when you create a Kubernetes Ingress and
+      # an AWS Network Load Balancer (NLB) when you create a Kubernetes Service of type LoadBalancer using IP targets on 1.18 or later Amazon EKS clusters.
+
+      # Possible variables in resourceTemplates:
+      # ITEM_NAME,
+      # CR_NAME = artemis-broker,
+      # BROKER_ORDINAL, CR_NAMESPACE, INGRESS_DOMAIN, RES_NAME
       # see https://aws.amazon.com/blogs/containers/exposing-kubernetes-applications-part-1-service-and-ingress-resources/
       # see https://aws.amazon.com/blogs/containers/exposing-kubernetes-applications-part-2-aws-load-balancer-controller/
       # https://aws.amazon.com/it/blogs/containers/setting-up-end-to-end-tls-encryption-on-amazon-eks-with-the-new-aws-load-balancer-controller/
       - selector:
           kind: "Ingress"
+        # See list of ingress annotations:
+        # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/ingress/annotations/
+        # Configuration of Application Load Balancer for Ingress
         annotations:
             alb.ingress.kubernetes.io/load-balancer-name: artemis-webconsole-lb-$(BROKER_ORDINAL)
+            # Other option: instance
+            # ip: target is specified using the ip address
+            # instance: target is specified using the ID of the EC2 instance
+            # instance is mainly used when backwards compatability is required or if it's required to route traffic
+            # through an EC2 instance
             alb.ingress.kubernetes.io/target-type: ip
+            # Starting v2.2.0 release, the AWS Load balancer controller provisions an internal NLB by default.
+            # To create an internet-facing load balancer, apply the following annotation to your service:
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/healthcheck-path: /healthz
       # see https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
       - selector:
           kind: "Service"
+        # Configuration of Network Load Balancer
         annotations:
+            service.beta.kubernetes.io/aws-load-balancer-name: $(CR_NAME)-$(BROKER_ORDINAL)
+            # this is telling k8s 'let AWS handle this load balancer in the cloud' (AWS Load Balancer Controller)
             service.beta.kubernetes.io/aws-load-balancer-type: external
+            # see above
             service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+            # see above
             service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
   deploymentPlan:
     size: 3

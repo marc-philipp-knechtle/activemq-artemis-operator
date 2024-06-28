@@ -33,6 +33,10 @@ spec:
             # To create an internet-facing load balancer, apply the following annotation to your service:
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/healthcheck-path: /healthz
+            # see https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/ingress/annotations/#ssl
+            alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-west-1:069512370968:certificate/cf19e76d-2ef6-4907-a061-983a4e3cda6b
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+            alb.ingress.kubernetes.io/tls-redirect: '443'
       # see https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
       - selector:
           kind: "Service"
@@ -53,7 +57,7 @@ spec:
     #           Error with persistenceEnabled true: 0/3 nodes are available: pod has unbound immediate
     #           PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
     #           -> solved with podSecurityContext.fsGroup
-    persistenceEnabled: true
+    persistenceEnabled: false
     # <!-- -->
     # messageMigration requires 2+ brokers
     messageMigration: true
@@ -92,5 +96,6 @@ spec:
     exposeMode: ingress
     # this translates to no specific requirement on the ingress domain
     ingressHost: $(INGRESS_DOMAIN)
+#     ingressHost: anevis-artemis.de
   adminUser: artemis
   adminPassword: artemis

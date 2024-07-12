@@ -10,7 +10,7 @@ availabilityZones:
 metadata:
   name: ${EKS_CLUSTER_NAME}
   region: ${AWS_REGION}
-  version: '1.27'
+  version: '1.29'
   tags:
     karpenter.sh/discovery: ${EKS_CLUSTER_NAME}
     created-by: anevis-solutions
@@ -82,7 +82,8 @@ managedNodeGroups:
   # Reference found with this video: https://www.youtube.com/watch?v=a4qdvu5cVIU
   # And via querying in bing chat.
   privateNetworking: false
-  releaseVersion: 1.27.3-20230816
+  # This version is out of date: Documentation: If you don't specify a version, the template's default version is used
+  # releaseVersion: 1.27.3-20230816
   updateConfig:
     # maximum percentage of nodes that can be unavailable during an update
     maxUnavailablePercentage: 50

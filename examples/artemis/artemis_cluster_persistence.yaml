@@ -40,7 +40,7 @@ spec:
       # see https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
       - selector:
           kind: "Service"
-        # Configuration of Network Load Balancer
+        # Configuration of Network Load Balancer for the acceptor
         annotations:
             service.beta.kubernetes.io/aws-load-balancer-name: $(CR_NAME)-$(BROKER_ORDINAL)
             # this is telling k8s 'let AWS handle this load balancer in the cloud' (AWS Load Balancer Controller)
@@ -49,6 +49,11 @@ spec:
             service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
             # see above
             service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+            service.beta.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
+            # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: # todo maybe adding the cert manually
+            # service.beta.kubernetes.io/aws-load-balancer-type: "nlb" This caused the LoadBalancer not beeing created :(
+            # In case of TCP, NLB with IP targets does not pass the client source IP address unless specifically configured via target group attributes. Your application pods might not see the actual client IP address even if NLB passes it along, for example instance mode with externalTrafficPolicy set to Cluster. In such cases, you can configure NLB proxy protocl v2 via annotation if you need visibility into the client source IP address on your application pods.
+            service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
   deploymentPlan:
     size: 3
     # (see description in operator.md)

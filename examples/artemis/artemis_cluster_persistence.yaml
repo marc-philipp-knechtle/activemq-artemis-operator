@@ -34,7 +34,7 @@ spec:
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/healthcheck-path: /healthz
             # see https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/ingress/annotations/#ssl
-            alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-west-1:069512370968:certificate/cf19e76d-2ef6-4907-a061-983a4e3cda6b
+            alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
             alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
             alb.ingress.kubernetes.io/tls-redirect: '443'
       # see https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html

@@ -37,12 +37,16 @@ spec:
             alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
             alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
             alb.ingress.kubernetes.io/tls-redirect: '443'
+        patch:
+            kind: Ingress
+            spec:
+                ingressClassName: alb
       # see https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
       - selector:
           kind: "Service"
         # Configuration of Network Load Balancer for the acceptor
         annotations:
-            service.beta.kubernetes.io/aws-load-balancer-name: $(CR_NAME)-$(BROKER_ORDINAL)
+            service.beta.kubernetes.io/aws-load-balancer-name: anevis-acceptor-all-$(BROKER_ORDINAL)
             # this is telling k8s 'let AWS handle this load balancer in the cloud' (AWS Load Balancer Controller)
             service.beta.kubernetes.io/aws-load-balancer-type: external
             # see above
@@ -52,8 +56,16 @@ spec:
             service.beta.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
             # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: # todo maybe adding the cert manually
             # service.beta.kubernetes.io/aws-load-balancer-type: "nlb" This caused the LoadBalancer not beeing created :(
-            # In case of TCP, NLB with IP targets does not pass the client source IP address unless specifically configured via target group attributes. Your application pods might not see the actual client IP address even if NLB passes it along, for example instance mode with externalTrafficPolicy set to Cluster. In such cases, you can configure NLB proxy protocl v2 via annotation if you need visibility into the client source IP address on your application pods.
+            # In case of TCP, NLB with IP targets does not pass the client source IP address unless specifically configured via target group attributes.
+            # Your application pods might not see the actual client IP address even if NLB passes it along, for example instance mode with externalTrafficPolicy set to Cluster.
+            # In such cases, you can configure NLB proxy protocol v2 via annotation if you need visibility into the client source IP address on your application pods.
             service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
+      - selector:
+          kind: "Service"
+        patch:
+            kind: Service
+            spec:
+                type: LoadBalancer
   deploymentPlan:
     size: 3
     # (see description in operator.md)
@@ -81,26 +93,30 @@ spec:
   acceptors:
     - name: anevis-acceptor-all
       protocols: all
-      sslEnabled: false
       needClientAuth: false
       wantClientAuth: false
       verifyHost: false
-      expose: true
-      # mode to expose the acceptor. supported values are route and ingress
-      # route = exposing with openshift routes
-      # ingress = k8s nginx ingress with TLS passthrough
-      exposeMode: ingress
-      # I don't know the optimal value for ingressHost yet!
-      # It is required for acceptors exposed with ingress
-      ingressHost: $(INGRESS_DOMAIN)
+      # sslEnabled, expose and exposeMode does not! work for the acceptor. This is bad because there is no ingress creation :(
+      # This is because the ssl certificate is evaluated beforehand.
+      # You can view this in: activemqartemis_reconciler.go/generateAcceptorsString() + activemqartemis_reconciler.go/generateCommonSSLFlags() <- This is where the error is thrown!
+      # There are Options to handle this issue:
+          # 1. rewrite the operator so no ssl Key is required such as in the mgmnt console
+            # -> Downside: Hacky Workaround, We'd have to check each update throughoutly on possible clashes
+          # 2. use cert-manager as Certificate Authority (supported by awspca/aws-privateca-issuer
+            # -> This seems like the 'cleanest' solution however:
+            # -> Downside: PRIVATE! CA - we need ACM with public Certificates
+          # 3. Forcing the creation of a LoadBalancer (via resourceTemplates) and add ssl manually
+      # exposeMode = mode to expose the acceptor. supported values are route (openshift) and ingress (k8s nginx ing)
+      # exposeMode: ingress
+      # sslEnabled: true
+      # expose: false
       name: anevis-acceptor-all
   console:
     expose: true
+    exposeMode: ingress
     name: webconsole
     sslEnabled: false
-    exposeMode: ingress
     # this translates to no specific requirement on the ingress domain
     ingressHost: $(INGRESS_DOMAIN)
-#     ingressHost: anevis-artemis.de
   adminUser: artemis
   adminPassword: artemis

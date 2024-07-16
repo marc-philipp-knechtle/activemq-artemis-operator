@@ -515,7 +515,7 @@ spec:
   deploymentPlan:
     livenessProbe:
       tcpSocket:
-        port: 8181
+        port: 8161
       initialDelaySeconds: 30,
       timeoutSeconds:      5,
 ```

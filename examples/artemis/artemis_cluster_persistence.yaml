@@ -23,7 +23,7 @@ spec:
         # Configuration of Application Load Balancer for Ingress
         annotations:
             alb.ingress.kubernetes.io/load-balancer-name: artemis-webconsole-lb-$(BROKER_ORDINAL)
-            # Other option: instance
+            # options:
             # ip: target is specified using the ip address
             # instance: target is specified using the ID of the EC2 instance
             # instance is mainly used when backwards compatability is required or if it's required to route traffic
@@ -48,24 +48,36 @@ spec:
         annotations:
             service.beta.kubernetes.io/aws-load-balancer-name: anevis-acceptor-all-$(BROKER_ORDINAL)
             # this is telling k8s 'let AWS handle this load balancer in the cloud' (AWS Load Balancer Controller)
+            # options: nlb-ip = deprecated
+            # external = depend on aws-load-balancer-nlb-target-type
             service.beta.kubernetes.io/aws-load-balancer-type: external
             # see above
             service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
             # see above
             service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
-            service.beta.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
-            # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: # todo maybe adding the cert manually
-            # service.beta.kubernetes.io/aws-load-balancer-type: "nlb" This caused the LoadBalancer not beeing created :(
-            # In case of TCP, NLB with IP targets does not pass the client source IP address unless specifically configured via target group attributes.
-            # Your application pods might not see the actual client IP address even if NLB passes it along, for example instance mode with externalTrafficPolicy set to Cluster.
-            # In such cases, you can configure NLB proxy protocol v2 via annotation if you need visibility into the client source IP address on your application pods.
-            service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
+            # This is the same format as above with the Ingress (Used for testing)
+            # service.beta.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
+            # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
+            # .../aws-load-balancer-backend-protocol specifies whether to use TLS for the backend traffic between the load balancer and the kubernetes pods.
+            # TCP = default
+            # SSL = NLB uses TLS connections for the traffic to your kubernetes pods in case of TLS listeners
+            service.beta.kubernetes.io/aws-load-balancer-backend-protocol: TCP
+#             # In case of TCP, NLB with IP targets does not pass the client source IP address unless specifically configured via target group attributes.
+#             # Your application pods might not see the actual client IP address even if NLB passes it along, for example instance mode with externalTrafficPolicy set to Cluster.
+#             # In such cases, you can configure NLB proxy protocol v2 via annotation if you need visibility into the client source IP address on your application pods.
+#             service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
       - selector:
           kind: "Service"
         patch:
             kind: Service
             spec:
                 type: LoadBalancer
+                # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/#service-annotations
+                # for k8s 1.22 and later if ... is set to false, NodePort must be allocated manually
+                allocateLoadBalancerNodePorts: true
+                # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.4/guide/service/annotations/#service-annotations
+                # If you configure spec.loadBalancerClass, the controller defaults to instance target type
+                loadBalancerClass: service.k8s.aws/nlb
   deploymentPlan:
     size: 3
     # (see description in operator.md)
@@ -74,7 +86,7 @@ spec:
     #           Error with persistenceEnabled true: 0/3 nodes are available: pod has unbound immediate
     #           PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
     #           -> solved with podSecurityContext.fsGroup
-    persistenceEnabled: false
+    persistenceEnabled: true
     # <!-- -->
     # messageMigration requires 2+ brokers
     messageMigration: true
@@ -101,11 +113,11 @@ spec:
       # You can view this in: activemqartemis_reconciler.go/generateAcceptorsString() + activemqartemis_reconciler.go/generateCommonSSLFlags() <- This is where the error is thrown!
       # There are Options to handle this issue:
           # 1. rewrite the operator so no ssl Key is required such as in the mgmnt console
-            # -> Downside: Hacky Workaround, We'd have to check each update throughoutly on possible clashes
+            # -> Downside: Hacky Workaround, We'd have to check each update throughout on possible clashes
           # 2. use cert-manager as Certificate Authority (supported by awspca/aws-privateca-issuer
             # -> This seems like the 'cleanest' solution however:
             # -> Downside: PRIVATE! CA - we need ACM with public Certificates
-          # 3. Forcing the creation of a LoadBalancer (via resourceTemplates) and add ssl manually
+          # 3. Forcing the creation of a LoadBalancer (via resourceTemplates) and add ssl manually -> This is what I try in my current attempts
       # exposeMode = mode to expose the acceptor. supported values are route (openshift) and ingress (k8s nginx ing)
       # exposeMode: ingress
       # sslEnabled: true

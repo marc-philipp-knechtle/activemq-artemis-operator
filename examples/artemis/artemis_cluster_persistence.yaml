@@ -3,6 +3,9 @@ kind: ActiveMQArtemis
 metadata:
   name: artemis-broker
 spec:
+  # todo fix this with 'in-yaml' keystore credentials
+  adminUser: dummyUser
+  adminPassword: dummyPassword
   # version: 2.32.0 # uncomment the version, in the hope that the broker chooses the most recent one!
   resourceTemplates:
       # The new AWS Load Balancer manages AWS Elastic Load Balancers for a Kubernetes cluster.
@@ -57,15 +60,20 @@ spec:
             service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
             # This is the same format as above with the Ingress (Used for testing)
             # service.beta.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
-            # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
+            service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:eu-central-1:069512370968:certificate/e247b2ec-f880-42a3-9593-18f19dfbf3ca
+            # .../aws-load-balancer-ssl-ports specifies the frontend ports with TLS listeners
+            # if not specified, the controller creates TLS Listeners for all service ports
+            # specify this if you need TLS and non-TLS listeners on the same ELB
+            service.beta.kubernetes.io/aws-load-balancer-ssl-ports: '61626'
+            service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
             # .../aws-load-balancer-backend-protocol specifies whether to use TLS for the backend traffic between the load balancer and the kubernetes pods.
             # TCP = default
             # SSL = NLB uses TLS connections for the traffic to your kubernetes pods in case of TLS listeners
             service.beta.kubernetes.io/aws-load-balancer-backend-protocol: TCP
-#             # In case of TCP, NLB with IP targets does not pass the client source IP address unless specifically configured via target group attributes.
-#             # Your application pods might not see the actual client IP address even if NLB passes it along, for example instance mode with externalTrafficPolicy set to Cluster.
-#             # In such cases, you can configure NLB proxy protocol v2 via annotation if you need visibility into the client source IP address on your application pods.
-#             service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
+            # In case of TCP, NLB with IP targets does not pass the client source IP address unless specifically configured via target group attributes.
+            # Your application pods might not see the actual client IP address even if NLB passes it along, for example instance mode with externalTrafficPolicy set to Cluster.
+            # In such cases, you can configure NLB proxy protocol v2 via annotation if you need visibility into the client source IP address on your application pods.
+            # service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
       - selector:
           kind: "Service"
         patch:
@@ -79,6 +87,8 @@ spec:
                 # If you configure spec.loadBalancerClass, the controller defaults to instance target type
                 loadBalancerClass: service.k8s.aws/nlb
   deploymentPlan:
+    # Whether a broker is clustered
+    clustered: true
     size: 3
     # (see description in operator.md)
     # = create brokers with persistent Storage, each broker requires 2GB
@@ -87,7 +97,6 @@ spec:
     #           PersistentVolumeClaims. preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
     #           -> solved with podSecurityContext.fsGroup
     persistenceEnabled: true
-    # <!-- -->
     # messageMigration requires 2+ brokers
     messageMigration: true
     # This enables to use the persistenceEnabled attribute above
@@ -102,6 +111,8 @@ spec:
     # Further discussion here: https://github.com/artemiscloud/activemq-artemis-operator/issues/52
     podSecurityContext:
       fsGroup: 0
+    # If true require user password login credentials for broker protocol ports
+    requireLogin: true
   acceptors:
     - name: anevis-acceptor-all
       protocols: all
@@ -130,5 +141,3 @@ spec:
     sslEnabled: false
     # this translates to no specific requirement on the ingress domain
     ingressHost: $(INGRESS_DOMAIN)
-  adminUser: artemis
-  adminPassword: artemis

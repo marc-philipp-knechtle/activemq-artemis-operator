@@ -86,12 +86,6 @@ managedNodeGroups:
   updateConfig:
     # maximum percentage of nodes that can be unavailable during an update
     maxUnavailablePercentage: 50
-  # -------------------------------------------
-  # Removed from eksworkshop config
-  # the kubernetes labels to be applied to the nodes in the node group
-  # labels:
-  #   workshop-default: 'yes'
-  # -------------------------------------------
   iam:
     withAddonPolicies:
       # See this: https://github.com/kubernetes-sigs/external-dns

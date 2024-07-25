@@ -92,11 +92,10 @@ managedNodeGroups:
       # This is not required, it was just interesting to experiment with this
       externalDNS: true
       certManager: true
-      # Replaces the following commands (during setup, see nodes):
+      # This creates the AWSLoadBalancerControllerIAMPolicy
+      # Replaces the following commands:
       # `curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.5.4/docs/install/iam_policy.json`
       # `aws iam create-policy \
       #       --policy-name AWSLoadBalancerControllerIAMPolicy \
       #       --policy-document file://iam_policy.json`
-      # This does not work for some reason - https://eksctl.io/usage/iam-policies/
-      # No Idea why :(
       awsLoadBalancerController: true

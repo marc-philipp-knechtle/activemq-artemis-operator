@@ -36,7 +36,6 @@ addons:
   # Jobs: Allocating VPC Ip addresses to k8s nodes, configuring the networking for each pod on each node
 - name: vpc-cni
   version: 1.14.1
-  # Todo I don't know how this vpc-cni vonfiguration values affect the cluster
   # vpc-cni is also a requirement for the AWS NLB https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/service/nlb/
   # ENABLE_PREFIX_DELEGATION = assign multiple IP addresses from a large IP address block to a network interface
   # ENABLE_POD_ENI = enables Pod Elastic Network Interface, allows to assign ENI to a Pod for network traffic isolution

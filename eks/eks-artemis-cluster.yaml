@@ -38,8 +38,8 @@ addons:
   version: 1.14.1
   # vpc-cni is also a requirement for the AWS NLB https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/service/nlb/
   # ENABLE_PREFIX_DELEGATION = assign multiple IP addresses from a large IP address block to a network interface
-  # ENABLE_POD_ENI = enables Pod Elastic Network Interface, allows to assign ENI to a Pod for network traffic isolution
-  # POD_SECURITY_GROU_ENFORCING_MODE = standard = security group specified in the pod annotation withh be enforced
+  # ENABLE_POD_ENI = enables Pod Elastic Network Interface, allows to assign ENI to a Pod for network traffic isolation
+  # POD_SECURITY_GROUP_ENFORCING_MODE = standard = security group specified in the pod annotation with be enforced
   # enableNetworkPolicy = allows to control traffic flow at IP address and Poert level
   configurationValues:  "{\"env\":{\"ENABLE_PREFIX_DELEGATION\":\"true\", \"ENABLE_POD_ENI\":\"true\", \"POD_SECURITY_GROUP_ENFORCING_MODE\":\"standard\"},\"enableNetworkPolicy\": \"true\"}"
   # This config overwrites any previous config
